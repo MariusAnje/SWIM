@@ -120,4 +120,4 @@ class SCrossEntropyLossFunction(autograd.Function):
         
         test_nan(exp, exp_sum, grad_input, grad_inputS, ratio)
 
-        return grad_input, grad_inputS, None, None, None, None
+        return grad_input, grad_inputS, None, None, None, None, None, None

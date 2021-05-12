@@ -1,11 +1,5 @@
 import torch
-from torch import autograd
 from torch import nn
-import torchvision
-from torch import optim
-import torchvision.transforms as transforms
-from tqdm.notebook import tqdm
-import numpy as np
 from Functions import SLinearFunction, SMSEFunction, SCrossEntropyLossFunction
 
 class SLinear(nn.Module):
@@ -111,3 +105,17 @@ class Model(nn.Module):
         x = self.relu(self.fc2(x))
         x = self.fc3(x)
         return x
+
+class SCrossEntropyLoss(nn.Module):
+    def __init__(self, weight=None, size_average=None, ignore_index=-100, reduce=None, reduction='mean'):
+        super().__init__()
+        self.function = SCrossEntropyLossFunction
+        self.weight = weight
+        self.size_average = size_average
+        self.ignore_index = ignore_index
+        self.reduce = reduce
+        self.reduction = reduction
+    
+    def forward(self, input, inputS, labels):
+        output = self.function.apply(input, inputS, labels, self.weight, self.size_average, self.ignore_index, self.reduce, self.reduction)
+        return output
