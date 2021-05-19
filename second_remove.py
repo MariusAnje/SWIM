@@ -79,7 +79,7 @@ def STrain(epochs, header):
         if test_acc > best_acc:
             best_acc = test_acc
             torch.save(model.state_dict(), f"tmp_best_{header}.pt")
-        print(f"epoch: {i:-3d}, test acc: {test_acc:.4f}, loss: {running_loss / len(trainloader):.4f}, s: {(running_l - running_loss) / len(trainloader):-5.4f}")
+        # print(f"epoch: {i:-3d}, test acc: {test_acc:.4f}, loss: {running_loss / len(trainloader):.4f}, s: {(running_l - running_loss) / len(trainloader):-5.4f}")
 
 def GetSecond():
     optimizer.zero_grad()
@@ -104,17 +104,18 @@ if __name__ == "__main__":
             help='portion of the mask')
     args = parser.parse_args()
 
+    print(args)
     header = time.time()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     BS = 128
 
-    trainset = torchvision.datasets.MNIST(root='~/testCode/data', train=True,
+    trainset = torchvision.datasets.MNIST(root='~/Private/data', train=True,
                                             download=False, transform=transforms.ToTensor())
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS,
                                             shuffle=True, num_workers=2)
 
-    testset = torchvision.datasets.MNIST(root='~/testCode/data', train=False,
+    testset = torchvision.datasets.MNIST(root='~/Private/data', train=False,
                                         download=False, transform=transforms.ToTensor())
     testloader = torch.utils.data.DataLoader(testset, batch_size=BS,
                                                 shuffle=False, num_workers=2)
@@ -164,4 +165,4 @@ if __name__ == "__main__":
     for _ in loader:
         acc = Seval_noise(args.noise_var, False)
         fine_mask_acc_list.append(acc)
-    print(f"With mask noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
+    print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
