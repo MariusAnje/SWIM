@@ -7,6 +7,7 @@ import torchvision.transforms as transforms
 from tqdm.notebook import tqdm
 import numpy as np
 
+
 class SLinearFunction(autograd.Function):
 
     # Note that both forward and backward are @staticmethods
