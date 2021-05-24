@@ -59,7 +59,7 @@ def Seval_noise(var, is_clear_mask=True):
             total += len(correction)
     return (correct/total).cpu().numpy()
 
-def STrain(epochs, header):
+def STrain(epochs, header, verbose=False):
     best_acc = 0.0
     for i in range(epochs):
         running_loss = 0.
@@ -79,7 +79,8 @@ def STrain(epochs, header):
         if test_acc > best_acc:
             best_acc = test_acc
             torch.save(model.state_dict(), f"tmp_best_{header}.pt")
-        # print(f"epoch: {i:-3d}, test acc: {test_acc:.4f}, loss: {running_loss / len(trainloader):.4f}, s: {(running_l - running_loss) / len(trainloader):-5.4f}")
+        if verbose:
+            print(f"epoch: {i:-3d}, test acc: {test_acc:.4f}, loss: {running_loss / len(trainloader):.4f}, s: {(running_l - running_loss) / len(trainloader):-5.4f}")
 
 def GetSecond():
     optimizer.zero_grad()
@@ -96,12 +97,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--train_epoch', action='store', type=int, default=20,
             help='# of epochs of training')
+    parser.add_argument('--fine_epoch', action='store', type=int, default=20,
+            help='# of epochs of finetuning')
     parser.add_argument('--noise_epoch', action='store', type=int, default=100,
             help='# of epochs of noise validations')
     parser.add_argument('--noise_var', action='store', type=float, default=0.1,
             help='noise variation')
     parser.add_argument('--mask_p', action='store', type=float, default=0.01,
             help='portion of the mask')
+    parser.add_argument('--device', action='store', default="cuda:0",
+            help='device used')
+    parser.add_argument('--verbose', action='store', type=bool, default=False,
+            help='see training process')
     args = parser.parse_args()
 
     print(args)
@@ -128,7 +135,7 @@ if __name__ == "__main__":
     criteria = SCrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.01)
 
-    STrain(args.train_epoch, header)
+    STrain(args.train_epoch, header, args.verbose)
 
     state_dict = torch.load(f"tmp_best_{header}.pt")
     model.load_state_dict(state_dict)
@@ -158,7 +165,10 @@ if __name__ == "__main__":
     print(f"With mask noise average acc: {np.mean(mask_acc_list):.4f}, std: {np.std(mask_acc_list):.4f}")
     
     optimizer = optim.SGD(model.parameters(), lr=1e-3)
-    STrain(1,header)
+    STrain(args.fine_epoch, header, args.verbose)
+    state_dict = torch.load(f"tmp_best_{header}.pt")
+    model.load_state_dict(state_dict)
+    torch.save(model.state_dict(), f"saved_{header}.pt")
     fine_mask_acc_list = []
     print(f"Finetune no noise: {Seval(False):.4f}")
     loader = range(args.noise_epoch)
