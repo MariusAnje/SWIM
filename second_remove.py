@@ -136,9 +136,9 @@ if __name__ == "__main__":
     criteria = SCrossEntropyLoss()
 
     optimizer = optim.Adam(model.parameters(), lr=0.01)
-    scheduler = optim.lr_scheduler.StepLR([20])
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
     STrain(args.train_epoch, header, args.verbose)
-    
+
     # optimizer = optim.SGD(model.parameters(), lr=0.001)
     # STrain(args.train_epoch - 20, header, args.verbose)
 
