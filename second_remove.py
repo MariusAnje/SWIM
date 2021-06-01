@@ -81,6 +81,7 @@ def STrain(epochs, header, verbose=False):
             torch.save(model.state_dict(), f"tmp_best_{header}.pt")
         if verbose:
             print(f"epoch: {i:-3d}, test acc: {test_acc:.4f}, loss: {running_loss / len(trainloader):.4f}, s: {(running_l - running_loss) / len(trainloader):-5.4f}")
+        scheduler.step()
 
 def GetSecond():
     optimizer.zero_grad()
@@ -135,9 +136,10 @@ if __name__ == "__main__":
     criteria = SCrossEntropyLoss()
 
     optimizer = optim.Adam(model.parameters(), lr=0.01)
-    STrain(20, header, args.verbose)
-    optimizer = optim.SGD(model.parameters(), lr=0.001)
-    STrain(args.train_epoch - 20, header, args.verbose)
+    scheduler = optim.lr_scheduler.StepLR([20])
+    STrain(args.train_epoch, header, args.verbose)
+    # optimizer = optim.SGD(model.parameters(), lr=0.001)
+    # STrain(args.train_epoch - 20, header, args.verbose)
 
     state_dict = torch.load(f"tmp_best_{header}.pt")
     model.load_state_dict(state_dict)
