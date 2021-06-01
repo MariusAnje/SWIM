@@ -137,7 +137,7 @@ if __name__ == "__main__":
     optimizer = optim.Adam(model.parameters(), lr=0.01)
     STrain(args.train_epoch, header, args.verbose)
     optimizer = optim.SGD(model.parameters(), lr=0.001)
-    STrain(args.train_epoch, header, args.verbose)
+    STrain(args.train_epoch * 9, header, args.verbose)
 
     state_dict = torch.load(f"tmp_best_{header}.pt")
     model.load_state_dict(state_dict)
@@ -160,11 +160,11 @@ if __name__ == "__main__":
     mask_acc_list = []
     model.set_mask(args.mask_p)
     print(f"with mask no noise: {Seval(False):.4f}")
-    loader = range(args.noise_epoch)
-    for _ in loader:
-        acc = Seval_noise(args.noise_var, False)
-        mask_acc_list.append(acc)
-    print(f"With mask noise average acc: {np.mean(mask_acc_list):.4f}, std: {np.std(mask_acc_list):.4f}")
+    # loader = range(args.noise_epoch)
+    # for _ in loader:
+    #     acc = Seval_noise(args.noise_var, False)
+    #     mask_acc_list.append(acc)
+    # print(f"With mask noise average acc: {np.mean(mask_acc_list):.4f}, std: {np.std(mask_acc_list):.4f}")
     
     optimizer = optim.SGD(model.parameters(), lr=1e-3)
     STrain(args.fine_epoch, header, args.verbose)
