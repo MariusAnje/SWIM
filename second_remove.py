@@ -110,6 +110,8 @@ if __name__ == "__main__":
             help='device used')
     parser.add_argument('--verbose', action='store', type=bool, default=False,
             help='see training process')
+    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet"],
+            help='model to use')
     args = parser.parse_args()
 
     print(args)
@@ -127,9 +129,13 @@ if __name__ == "__main__":
                                         download=False, transform=transforms.ToTensor())
     testloader = torch.utils.data.DataLoader(testset, batch_size=BS,
                                                 shuffle=False, num_workers=2)
+    if args.model == "MLP3":
+        model = SMLP3()
+    elif args.model == "MLP4":
+        model = SMLP4()
+    elif args.model == "LeNet":
+        model = SLeNet()
 
-    # model = SMLP4()
-    model = SLeNet()
     model.to(device)
     model.push_S_device()
     model.clear_noise()
