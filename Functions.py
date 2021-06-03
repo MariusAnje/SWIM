@@ -6,6 +6,7 @@ from torch import optim
 import torchvision.transforms as transforms
 from tqdm.notebook import tqdm
 import numpy as np
+import torch.nn.functional as F
 
 
 class SLinearFunction(autograd.Function):
@@ -49,6 +50,54 @@ class SLinearFunction(autograd.Function):
             grad_bias = grad_output.sum(0)
 
         return grad_input, grad_inputS, grad_weight, grad_weightS, grad_bias
+
+class SConv2dFunction(autograd.Function):
+    @staticmethod
+    def forward(ctx, input, inputS, weight, weightS, bias=None, stride=1, padding=0, dilation=1, groups=1):
+        # col_weights = weight.reshape(weight.shape[0], -1).swapaxes(0,1)
+        # input = F.pad(input,tuple(4*[padding]))
+        # bs, xc, xw, xh = input.shape
+        # oc, _, kw, kh = weight.shape
+        # ow, oh = xw - kw + 1, xh - kh + 1
+
+        # col_image = F.unfold(input,(kw,kh)).transpose(1,2)
+        # conv_out = col_image.matmul(w.view(w.size(0),-1).t()).transpose(1,2)
+        # conv_out = F.fold(conv_out, (ow, oh), (1,1))
+        # ctx.save_for_backward(col_image, weight, bias)
+        conv_out = F.conv2d(input, weight, bias, stride, padding, dilation, groups)
+        padding = padding[0]
+        padded_input = F.pad(input,tuple(4*[padding]))
+        ctx.save_for_backward(padded_input, weight, bias, torch.IntTensor([padding]).to(padded_input.device))
+        return conv_out, torch.ones_like(conv_out)
+    
+    @staticmethod
+    def backward(ctx, grad_output, grad_outputS):
+        input, weight, bias, padding = ctx.saved_tensors
+        col_image = F.unfold(input,(3,3)).transpose(1,2)
+        bs, channels, ow, oh = grad_output.shape
+        oc, ic, kw, kh = weight.shape
+        # col_grad_output = grad_output.view(bs, channels, -1)
+        grad_w = grad_output.view(bs, channels, -1).bmm(col_image).sum(dim=0).view(weight.shape)
+        grad_wS = grad_outputS.view(bs, channels, -1).bmm(col_image**2).sum(dim=0).view(weight.shape) # SSSS
+
+        if bias is None:
+            grad_b = None
+        else:
+            grad_b = grad_output.sum(axis=[0,2,3])
+
+        grad_output_padded = F.pad(grad_output,tuple(4*[kw-1-padding.item()]))
+        col_grad = F.unfold(grad_output_padded,(kh,kw)).transpose(1,2)
+        grad_outputS_padded = F.pad(grad_outputS,tuple(4*[kw-1-padding.item()])) # SSSS
+        col_gradS = F.unfold(grad_outputS_padded,(kh,kw)).transpose(1,2)
+        
+        flipped_w = weight.flip([2,3]).swapaxes(0,1)
+        col_flip = flipped_w.reshape(flipped_w.size(0),-1)
+        grad_i = col_grad.matmul(col_flip.t()).transpose(1,2)
+        grad_i = F.fold(grad_i, (ow, oh), (1,1))
+        grad_iS = col_gradS.matmul(col_flip.t()).transpose(1,2)
+        grad_iS = F.fold(grad_iS, (ow, oh), (1,1))
+
+        return grad_i, grad_iS, grad_w, grad_wS, grad_b, None, None, None, None
 
 class SMSEFunction(autograd.Function):
     @staticmethod

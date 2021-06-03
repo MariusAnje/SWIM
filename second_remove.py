@@ -3,7 +3,7 @@ import torchvision
 from torch import optim
 import torchvision.transforms as transforms
 import numpy as np
-from models import SCrossEntropyLoss, SMLP3, SMLP4
+from models import SCrossEntropyLoss, SMLP3, SMLP4, SLeNet
 from tqdm import tqdm
 import time
 import argparse
@@ -16,7 +16,7 @@ def eval():
     with torch.no_grad():
         for images, labels in trainloader:
             images, labels = images.to(device), labels.to(device)
-            images = images.view(-1, 784)
+            # images = images.view(-1, 784)
             outputs = model(images)
             predictions = outputs.argmax(dim=1)
             correction = predictions == labels
@@ -33,7 +33,7 @@ def Seval(is_clear_mask=True):
             model.clear_mask()
         for images, labels in testloader:
             images, labels = images.to(device), labels.to(device)
-            images = images.view(-1, 784)
+            # images = images.view(-1, 784)
             outputs = model(images)
             predictions = outputs[0].argmax(dim=1)
             correction = predictions == labels
@@ -51,7 +51,7 @@ def Seval_noise(var, is_clear_mask=True):
         model.set_noise(var)
         for images, labels in testloader:
             images, labels = images.to(device), labels.to(device)
-            images = images.view(-1, 784)
+            # images = images.view(-1, 784)
             outputs = model(images)
             predictions = outputs[0].argmax(dim=1)
             correction = predictions == labels
@@ -67,7 +67,7 @@ def STrain(epochs, header, verbose=False):
         for images, labels in trainloader:
             optimizer.zero_grad()
             images, labels = images.to(device), labels.to(device)
-            images = images.view(-1, 784)
+            # images = images.view(-1, 784)
             outputs, outputsS = model(images)
             loss = criteria(outputs, outputsS,labels)
             loss.backward()
@@ -87,7 +87,7 @@ def GetSecond():
     optimizer.zero_grad()
     for images, labels in trainloader:
         images, labels = images.to(device), labels.to(device)
-        images = images.view(-1, 784)
+        # images = images.view(-1, 784)
         outputs, outputsS = model(images)
         loss = criteria(outputs, outputsS,labels)
         loss.backward()
@@ -128,7 +128,8 @@ if __name__ == "__main__":
     testloader = torch.utils.data.DataLoader(testset, batch_size=BS,
                                                 shuffle=False, num_workers=2)
 
-    model = SMLP4()
+    # model = SMLP4()
+    model = SLeNet()
     model.to(device)
     model.push_S_device()
     model.clear_noise()
