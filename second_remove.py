@@ -168,7 +168,8 @@ if __name__ == "__main__":
     model.load_state_dict(state_dict)
     GetSecond()
     mask_acc_list = []
-    model.set_mask(args.mask_p)
+    th = model.calc_S_grad_th(args.mask_p)
+    model.set_mask(th, mode="th")
     print(f"with mask no noise: {Seval(False):.4f}")
     # loader = range(args.noise_epoch)
     # for _ in loader:

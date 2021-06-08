@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch._C import device
 from Functions import SLinearFunction, SConv2dFunction, SMSEFunction, SCrossEntropyLossFunction
 
 class SModule(nn.Module):
@@ -17,10 +18,14 @@ class SModule(nn.Module):
     def clear_noise(self):
         self.noise = torch.zeros_like(self.op.weight)
     
-    def set_mask(self, portion):
-        th = len(self.weightS.view(-1)) * (1-portion)
-        self.mask = self.weightS.view(-1).sort()[1].view(self.weightS.size()) <= th
-        # self.mask = (self.weightS.grad.data.abs() < portion).to(torch.float)
+    def set_mask(self, portion, mode):
+        if mode == "portion":
+            th = len(self.weightS.view(-1)) * (1-portion)
+            self.mask = self.weightS.view(-1).sort()[1].view(self.weightS.size()) <= th
+        elif mode == "th":
+            self.mask = (self.weightS.grad.data.abs() < portion).to(torch.float)
+        else:
+            raise NotImplementedError(f"Mode: {mode} not supported, only support mode portion & th, ")
     
     def clear_mask(self):
         self.mask = torch.ones_like(self.op.weight)
@@ -35,6 +40,9 @@ class SModule(nn.Module):
     
     def fetch_S_grad(self):
         return self.weightS.grad.sum()
+    
+    def fetch_S_grad_list(self):
+        return self.weightS.grad.data
 
     def do_second(self):
         self.op.weight.grad.data = self.op.weight.grad.data / (self.weightS.grad.data + 1e-10)
@@ -117,6 +125,18 @@ class SModel(nn.Module):
                 S_grad_sum += m.fetch_S_grad()
         return S_grad_sum
     
+    def calc_S_grad_th(self, quantile):
+        S_grad_list = None
+        for m in self.modules():
+            if isinstance(m, SLinear) or isinstance(m, SConv2d):
+                if S_grad_list is None:
+                    S_grad_list = m.fetch_S_grad_list().view(-1)
+                else:
+                    S_grad_list = torch.cat([S_grad_list, m.fetch_S_grad_list().view(-1)])
+        th = torch.quantile(S_grad_list, 1-quantile)
+        # print(th)
+        return th
+
     def set_noise(self, var):
         for m in self.modules():
             if isinstance(m, SLinear) or isinstance(m, SConv2d):
@@ -127,10 +147,10 @@ class SModel(nn.Module):
             if isinstance(m, SLinear) or isinstance(m, SConv2d):
                 m.clear_noise()
     
-    def set_mask(self, th):
+    def set_mask(self, th, mode):
         for m in self.modules():
             if isinstance(m, SLinear) or isinstance(m, SConv2d):
-                m.set_mask(th)
+                m.set_mask(th, mode)
     
     def clear_mask(self):
         for m in self.modules():
