@@ -121,7 +121,7 @@ if __name__ == "__main__":
             help='model to use')
     parser.add_argument('--header', action='store',type=int, default=0,
             help='use which saved state dict')
-    parser.add_argument('--pretrained', action='store',type=bool, default=True,
+    parser.add_argument('--pretrained', action='store',type=str2bool, default=True,
             help='if to use pretrained model')
     args = parser.parse_args()
 
@@ -184,7 +184,7 @@ if __name__ == "__main__":
         print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
         
 
-    state_dict = torch.load(f"saved_B_{header}.pt")
+    state_dict = torch.load(f"saved_B_{header}.pt", map_location=device)
     model.load_state_dict(state_dict)
     GetSecond()
     print(f"S grad before masking: {model.fetch_S_grad().item()}")
@@ -199,8 +199,9 @@ if __name__ == "__main__":
     # print(f"With mask noise average acc: {np.mean(mask_acc_list):.4f}, std: {np.std(mask_acc_list):.4f}")
     
     optimizer = optim.SGD(model.parameters(), lr=1e-3)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
     STrain(args.fine_epoch, header, args.verbose)
-    state_dict = torch.load(f"tmp_best_{header}_{header_timer}.pt")
+    state_dict = torch.load(f"saved_B_{header}.pt", map_location=device)
     model.load_state_dict(state_dict)
     torch.save(model.state_dict(), f"saved_A_{header}_{header_timer}.pt")
     fine_mask_acc_list = []
@@ -211,4 +212,4 @@ if __name__ == "__main__":
         fine_mask_acc_list.append(acc)
     print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
     GetSecond()
-    print(f"S grad before masking: {model.fetch_S_grad().item()}")
+    print(f"S grad after masking: {model.fetch_S_grad().item()}")
