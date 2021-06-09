@@ -112,6 +112,10 @@ if __name__ == "__main__":
             help='see training process')
     parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet"],
             help='model to use')
+    parser.add_argument('--header', action='store',type=int, default=0,
+            help='use which saved state dict')
+    parser.add_argument('--pretrained', action='store',type=bool, default=True,
+            help='if to use pretrained model')
     args = parser.parse_args()
 
     print(args)
@@ -144,49 +148,59 @@ if __name__ == "__main__":
 
     optimizer = optim.Adam(model.parameters(), lr=0.01)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
-    STrain(args.train_epoch, header, args.verbose)
+    if not args.pretrained:
+        STrain(args.train_epoch, header, args.verbose)
 
-    # optimizer = optim.SGD(model.parameters(), lr=0.001)
-    # STrain(args.train_epoch - 20, header, args.verbose)
+        # optimizer = optim.SGD(model.parameters(), lr=0.001)
+        # STrain(args.train_epoch - 20, header, args.verbose)
 
-    state_dict = torch.load(f"tmp_best_{header}.pt")
-    model.load_state_dict(state_dict)
-    torch.save(model.state_dict(), f"saved_B_{header}.pt")
+        state_dict = torch.load(f"tmp_best_{header}.pt")
+        model.load_state_dict(state_dict)
+        torch.save(model.state_dict(), f"saved_B_{header}.pt")
 
-    no_mask_acc_list = []
-    state_dict = torch.load(f"saved_B_{header}.pt")
-    print(f"No mask no noise: {Seval(False):.4f}")
-    model.load_state_dict(state_dict)
-    model.clear_mask()
-    loader = range(args.noise_epoch)
-    for _ in loader:
-        acc = Seval_noise(args.noise_var, False)
-        no_mask_acc_list.append(acc)
-    print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
-    torch.save(no_mask_acc_list, f"no_mask_list_{header}.pt")
-
-    # state_dict = torch.load(f"saved_B_{header}.pt")
-    # model.load_state_dict(state_dict)
-    # GetSecond()
-    # mask_acc_list = []
-    # th = model.calc_S_grad_th(args.mask_p)
-    # model.set_mask(th, mode="th")
-    # print(f"with mask no noise: {Seval(False):.4f}")
-    # # loader = range(args.noise_epoch)
-    # # for _ in loader:
-    # #     acc = Seval_noise(args.noise_var, False)
-    # #     mask_acc_list.append(acc)
-    # # print(f"With mask noise average acc: {np.mean(mask_acc_list):.4f}, std: {np.std(mask_acc_list):.4f}")
+        no_mask_acc_list = []
+        state_dict = torch.load(f"saved_B_{header}.pt")
+        print(f"No mask no noise: {Seval(False):.4f}")
+        model.load_state_dict(state_dict)
+        model.clear_mask()
+        loader = range(args.noise_epoch)
+        for _ in loader:
+            acc = Seval_noise(args.noise_var, False)
+            no_mask_acc_list.append(acc)
+        print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
+        torch.save(no_mask_acc_list, f"no_mask_list_{header}.pt")
     
-    # optimizer = optim.SGD(model.parameters(), lr=1e-3)
-    # STrain(args.fine_epoch, header, args.verbose)
-    # state_dict = torch.load(f"tmp_best_{header}.pt")
-    # model.load_state_dict(state_dict)
-    # torch.save(model.state_dict(), f"saved_A_{header}.pt")
-    # fine_mask_acc_list = []
-    # print(f"Finetune no noise: {Seval(False):.4f}")
+    else:
+        header = args.header
+        no_mask_acc_list = torch.load(f"no_mask_list_{header}.pt")
+        print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
+        
+
+    state_dict = torch.load(f"saved_B_{header}.pt")
+    model.load_state_dict(state_dict)
+    GetSecond()
+    print(f"S grad before masking: {model.fetch_S_grad().item()}")
+    mask_acc_list = []
+    th = model.calc_S_grad_th(args.mask_p)
+    model.set_mask(th, mode="th")
+    print(f"with mask no noise: {Seval(False):.4f}")
     # loader = range(args.noise_epoch)
     # for _ in loader:
     #     acc = Seval_noise(args.noise_var, False)
-    #     fine_mask_acc_list.append(acc)
-    # print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
+    #     mask_acc_list.append(acc)
+    # print(f"With mask noise average acc: {np.mean(mask_acc_list):.4f}, std: {np.std(mask_acc_list):.4f}")
+    
+    optimizer = optim.SGD(model.parameters(), lr=1e-3)
+    STrain(args.fine_epoch, header, args.verbose)
+    state_dict = torch.load(f"tmp_best_{header}.pt")
+    model.load_state_dict(state_dict)
+    torch.save(model.state_dict(), f"saved_A_{header}.pt")
+    fine_mask_acc_list = []
+    print(f"Finetune no noise: {Seval(False):.4f}")
+    loader = range(args.noise_epoch)
+    for _ in loader:
+        acc = Seval_noise(args.noise_var, False)
+        fine_mask_acc_list.append(acc)
+    print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
+    GetSecond()
+    print(f"S grad before masking: {model.fetch_S_grad().item()}")
