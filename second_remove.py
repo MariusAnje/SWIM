@@ -120,6 +120,7 @@ if __name__ == "__main__":
 
     print(args)
     header = time.time()
+    header_timer = header
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     BS = 128
@@ -192,9 +193,9 @@ if __name__ == "__main__":
     
     optimizer = optim.SGD(model.parameters(), lr=1e-3)
     STrain(args.fine_epoch, header, args.verbose)
-    state_dict = torch.load(f"tmp_best_{header}.pt")
+    state_dict = torch.load(f"tmp_best_{header}_{header_timer}.pt")
     model.load_state_dict(state_dict)
-    torch.save(model.state_dict(), f"saved_A_{header}.pt")
+    torch.save(model.state_dict(), f"saved_A_{header}_{header_timer}.pt")
     fine_mask_acc_list = []
     print(f"Finetune no noise: {Seval(False):.4f}")
     loader = range(args.noise_epoch)
