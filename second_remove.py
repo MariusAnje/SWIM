@@ -163,29 +163,30 @@ if __name__ == "__main__":
         acc = Seval_noise(args.noise_var, False)
         no_mask_acc_list.append(acc)
     print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
+    torch.save(no_mask_acc_list, f"no_mask_list_{header}.pt")
 
-    state_dict = torch.load(f"saved_B_{header}.pt")
-    model.load_state_dict(state_dict)
-    GetSecond()
-    mask_acc_list = []
-    th = model.calc_S_grad_th(args.mask_p)
-    model.set_mask(th, mode="th")
-    print(f"with mask no noise: {Seval(False):.4f}")
+    # state_dict = torch.load(f"saved_B_{header}.pt")
+    # model.load_state_dict(state_dict)
+    # GetSecond()
+    # mask_acc_list = []
+    # th = model.calc_S_grad_th(args.mask_p)
+    # model.set_mask(th, mode="th")
+    # print(f"with mask no noise: {Seval(False):.4f}")
+    # # loader = range(args.noise_epoch)
+    # # for _ in loader:
+    # #     acc = Seval_noise(args.noise_var, False)
+    # #     mask_acc_list.append(acc)
+    # # print(f"With mask noise average acc: {np.mean(mask_acc_list):.4f}, std: {np.std(mask_acc_list):.4f}")
+    
+    # optimizer = optim.SGD(model.parameters(), lr=1e-3)
+    # STrain(args.fine_epoch, header, args.verbose)
+    # state_dict = torch.load(f"tmp_best_{header}.pt")
+    # model.load_state_dict(state_dict)
+    # torch.save(model.state_dict(), f"saved_A_{header}.pt")
+    # fine_mask_acc_list = []
+    # print(f"Finetune no noise: {Seval(False):.4f}")
     # loader = range(args.noise_epoch)
     # for _ in loader:
     #     acc = Seval_noise(args.noise_var, False)
-    #     mask_acc_list.append(acc)
-    # print(f"With mask noise average acc: {np.mean(mask_acc_list):.4f}, std: {np.std(mask_acc_list):.4f}")
-    
-    optimizer = optim.SGD(model.parameters(), lr=1e-3)
-    STrain(args.fine_epoch, header, args.verbose)
-    state_dict = torch.load(f"tmp_best_{header}.pt")
-    model.load_state_dict(state_dict)
-    torch.save(model.state_dict(), f"saved_A_{header}.pt")
-    fine_mask_acc_list = []
-    print(f"Finetune no noise: {Seval(False):.4f}")
-    loader = range(args.noise_epoch)
-    for _ in loader:
-        acc = Seval_noise(args.noise_var, False)
-        fine_mask_acc_list.append(acc)
-    print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
+    #     fine_mask_acc_list.append(acc)
+    # print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
