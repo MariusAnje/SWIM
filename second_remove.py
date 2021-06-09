@@ -92,6 +92,13 @@ def GetSecond():
         loss = criteria(outputs, outputsS,labels)
         loss.backward()
 
+def str2bool(a):
+    if a == "True":
+        return True
+    elif a == "False":
+        return False
+    else:
+        raise NotImplementedError(f"{a}")
 
 if __name__ == "__main__":
 
