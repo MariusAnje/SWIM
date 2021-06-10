@@ -7,6 +7,7 @@ from models import SCrossEntropyLoss, SMLP3, SMLP4, SLeNet
 from tqdm import tqdm
 import time
 import argparse
+import os
 
 def eval():
     total = 0
@@ -24,13 +25,11 @@ def eval():
             total += len(correction)
     return correct/total
 
-def Seval(is_clear_mask=True):
+def Seval():
     total = 0
     correct = 0
     with torch.no_grad():
         model.clear_noise()
-        if is_clear_mask:
-            model.clear_mask()
         for images, labels in testloader:
             images, labels = images.to(device), labels.to(device)
             # images = images.view(-1, 784)
@@ -41,12 +40,11 @@ def Seval(is_clear_mask=True):
             total += len(correction)
     return (correct/total).cpu().numpy()
 
-def Seval_noise(var, is_clear_mask=True):
+def Seval_noise(var):
     total = 0
     correct = 0
     model.clear_noise()
-    if is_clear_mask:
-        model.clear_mask()
+
     with torch.no_grad():
         model.set_noise(var)
         for images, labels in testloader:
@@ -84,6 +82,7 @@ def STrain(epochs, header, verbose=False):
         scheduler.step()
 
 def GetSecond():
+    model.clear_noise()
     optimizer.zero_grad()
     for images, labels in trainloader:
         images, labels = images.to(device), labels.to(device)
@@ -115,7 +114,7 @@ if __name__ == "__main__":
             help='portion of the mask')
     parser.add_argument('--device', action='store', default="cuda:0",
             help='device used')
-    parser.add_argument('--verbose', action='store', type=bool, default=False,
+    parser.add_argument('--verbose', action='store', type=str2bool, default=False,
             help='see training process')
     parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet"],
             help='model to use')
@@ -123,11 +122,17 @@ if __name__ == "__main__":
             help='use which saved state dict')
     parser.add_argument('--pretrained', action='store',type=str2bool, default=True,
             help='if to use pretrained model')
+    parser.add_argument('--use_mask', action='store',type=str2bool, default=True,
+            help='if to do the masking experiment')
+    parser.add_argument('--model_path', action='store', default="./pretrained",
+            help='where you put the pretrained model')
     args = parser.parse_args()
 
     print(args)
     header = time.time()
     header_timer = header
+    parent_path = "./"
+    
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     BS = 128
@@ -168,48 +173,52 @@ if __name__ == "__main__":
 
         no_mask_acc_list = []
         state_dict = torch.load(f"saved_B_{header}.pt")
-        print(f"No mask no noise: {Seval(False):.4f}")
+        print(f"No mask no noise: {Seval():.4f}")
         model.load_state_dict(state_dict)
         model.clear_mask()
         loader = range(args.noise_epoch)
         for _ in loader:
-            acc = Seval_noise(args.noise_var, False)
+            acc = Seval_noise(args.noise_var)
             no_mask_acc_list.append(acc)
         print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
         torch.save(no_mask_acc_list, f"no_mask_list_{header}.pt")
     
     else:
+        parent_path = args.model_path
         header = args.header
-        no_mask_acc_list = torch.load(f"no_mask_list_{header}.pt")
+        no_mask_acc_list = torch.load(os.path.join(parent_path, f"no_mask_list_{header}.pt"))
         print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
-        
 
-    state_dict = torch.load(f"saved_B_{header}.pt", map_location=device)
+
+    state_dict = torch.load(os.path.join(parent_path, f"saved_B_{header}.pt"), map_location=device)
     model.load_state_dict(state_dict)
+    model.clear_noise()
     GetSecond()
     print(f"S grad before masking: {model.fetch_S_grad().item()}")
-    mask_acc_list = []
-    th = model.calc_S_grad_th(args.mask_p)
-    model.set_mask(th, mode="th")
-    print(f"with mask no noise: {Seval(False):.4f}")
-    # loader = range(args.noise_epoch)
-    # for _ in loader:
-    #     acc = Seval_noise(args.noise_var, False)
-    #     mask_acc_list.append(acc)
-    # print(f"With mask noise average acc: {np.mean(mask_acc_list):.4f}, std: {np.std(mask_acc_list):.4f}")
     
-    optimizer = optim.SGD(model.parameters(), lr=1e-3)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
-    STrain(args.fine_epoch, header, args.verbose)
-    state_dict = torch.load(f"saved_B_{header}.pt", map_location=device)
-    model.load_state_dict(state_dict)
-    torch.save(model.state_dict(), f"saved_A_{header}_{header_timer}.pt")
-    fine_mask_acc_list = []
-    print(f"Finetune no noise: {Seval(False):.4f}")
-    loader = range(args.noise_epoch)
-    for _ in loader:
-        acc = Seval_noise(args.noise_var, False)
-        fine_mask_acc_list.append(acc)
-    print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
-    GetSecond()
-    print(f"S grad after masking: {model.fetch_S_grad().item()}")
+    if args.use_mask:
+        mask_acc_list = []
+        th = model.calc_S_grad_th(args.mask_p)
+        model.set_mask(th, mode="th")
+        print(f"with mask no noise: {Seval():.4f}")
+        # loader = range(args.noise_epoch)
+        # for _ in loader:
+        #     acc = Seval_noise(args.noise_var)
+        #     mask_acc_list.append(acc)
+        # print(f"With mask noise average acc: {np.mean(mask_acc_list):.4f}, std: {np.std(mask_acc_list):.4f}")
+        
+        optimizer = optim.SGD(model.parameters(), lr=1e-3)
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
+        STrain(args.fine_epoch, header_timer, args.verbose)
+
+        torch.save(model.state_dict(), f"saved_A_{header}_{header_timer}.pt")
+        fine_mask_acc_list = []
+        print(f"Finetune no noise: {Seval():.4f}")
+        loader = range(args.noise_epoch)
+        for _ in loader:
+            acc = Seval_noise(args.noise_var)
+            fine_mask_acc_list.append(acc)
+        print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
+        model.clear_noise()
+        GetSecond()
+        print(f"S grad after masking: {model.fetch_S_grad().item()}")

@@ -23,7 +23,7 @@ class SModule(nn.Module):
             th = len(self.weightS.view(-1)) * (1-portion)
             self.mask = self.weightS.view(-1).sort()[1].view(self.weightS.size()) <= th
         elif mode == "th":
-            self.mask = (self.weightS.grad.data.abs() < portion).to(torch.float)
+            self.mask = (self.weightS.grad.data.abs() <= portion).to(torch.float)
         else:
             raise NotImplementedError(f"Mode: {mode} not supported, only support mode portion & th, ")
     
@@ -39,10 +39,10 @@ class SModule(nn.Module):
                 self.weightS.grad.data *= 0
     
     def fetch_S_grad(self):
-        return self.weightS.grad.sum()
+        return (self.weightS.grad.abs() * self.mask).sum()
     
     def fetch_S_grad_list(self):
-        return self.weightS.grad.data
+        return (self.weightS.grad.data * self.mask)
 
     def do_second(self):
         self.op.weight.grad.data = self.op.weight.grad.data / (self.weightS.grad.data + 1e-10)

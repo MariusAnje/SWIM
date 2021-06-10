@@ -94,7 +94,7 @@ class SConv2dFunction(autograd.Function):
         col_flip = flipped_w.reshape(flipped_w.size(0),-1)
         grad_i = col_grad.matmul(col_flip.t()).transpose(1,2)
         grad_i = F.fold(grad_i, (ow, oh), (1,1))
-        grad_iS = col_gradS.matmul(col_flip.t()).transpose(1,2)
+        grad_iS = col_gradS.matmul(col_flip.t() ** 2).transpose(1,2)
         grad_iS = F.fold(grad_iS, (ow, oh), (1,1))
 
         return grad_i, grad_iS, grad_w, grad_wS, grad_b, None, None, None, None
