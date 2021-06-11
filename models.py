@@ -3,6 +3,7 @@ from torch import nn
 from Functions import SCrossEntropyLossFunction
 from modules import SLinear, SReLU, SModel, SConv2d, SMaxpool2D
 
+
 class SCrossEntropyLoss(nn.Module):
     def __init__(self, weight=None, size_average=None, ignore_index=-100, reduce=None, reduction='mean'):
         super().__init__()
