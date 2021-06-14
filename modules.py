@@ -32,6 +32,7 @@ class SModule(nn.Module):
 
     def push_S_device(self):
         self.weightS = self.weightS.to(self.op.weight.device)
+        self.mask = self.mask.to(self.op.weight.device)
 
     def clear_S_grad(self):
         with torch.no_grad():
@@ -167,13 +168,14 @@ class SModel(nn.Module):
             if isinstance(m, SLinear) or isinstance(m, SConv2d):
                 m.clear_mask()
     
-    def to_fake(self):
+    def to_fake(self, device):
         for name, m in self.named_modules():
             if isinstance(m, SLinear) or isinstance(m, SConv2d) or isinstance(m, SMaxpool2D) or isinstance(m, SReLU):
                 new = FakeSModule(m.op)
                 self._modules[name] = new
+        self.to(device)
     
-    def back_real(self):
+    def back_real(self, device):
         for name, m in self.named_modules():
             if isinstance(m, FakeSModule):
                 if isinstance(m.op, nn.Linear):
@@ -203,3 +205,4 @@ class SModel(nn.Module):
 
                 else:
                     raise NotImplementedError
+        self.to(device)
