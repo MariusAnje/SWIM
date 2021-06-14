@@ -170,7 +170,7 @@ if __name__ == "__main__":
 
         # optimizer = optim.SGD(model.parameters(), lr=0.001)
         # STrain(args.train_epoch - 20, header, args.verbose)
-
+        
         state_dict = torch.load(f"tmp_best_{header}.pt")
         model.load_state_dict(state_dict)
         torch.save(model.state_dict(), f"saved_B_{header}.pt")
@@ -192,12 +192,15 @@ if __name__ == "__main__":
         header = args.header
         no_mask_acc_list = torch.load(os.path.join(parent_path, f"no_mask_list_{header}.pt"))
         print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
+        model.back_real(device)
+        model.push_S_device()
 
     
     state_dict = torch.load(os.path.join(parent_path, f"saved_B_{header}.pt"), map_location=device)
     model.load_state_dict(state_dict)
     model.back_real(device)
     model.push_S_device()
+    criteria = SCrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.01)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
     model.clear_noise()

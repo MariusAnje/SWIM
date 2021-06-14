@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from torch._C import device
-from Functions import SLinearFunction, SConv2dFunction, SMSEFunction, SCrossEntropyLossFunction
+from Functions import SLinearFunction, SConv2dFunction, SMSEFunction, SCrossEntropyLossFunction    
 
 class SModule(nn.Module):
     def __init__(self):
