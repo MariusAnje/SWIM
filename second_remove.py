@@ -126,6 +126,8 @@ if __name__ == "__main__":
             help='if to do the masking experiment')
     parser.add_argument('--model_path', action='store', default="./pretrained",
             help='where you put the pretrained model')
+    parser.add_argument('--save_file', action='store',type=str2bool, default=True,
+            help='if to save the files')
     args = parser.parse_args()
 
     print(args)
@@ -194,13 +196,15 @@ if __name__ == "__main__":
     model.load_state_dict(state_dict)
     model.clear_noise()
     GetSecond()
-    print(f"S grad before masking: {model.fetch_S_grad().item()}")
+    print(f"S grad before masking: {model.fetch_S_grad().item():E}")
     
     if args.use_mask:
         mask_acc_list = []
         th = model.calc_S_grad_th(args.mask_p)
         model.set_mask(th, mode="th")
         print(f"with mask no noise: {Seval():.4f}")
+        # GetSecond()
+        print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
         # loader = range(args.noise_epoch)
         # for _ in loader:
         #     acc = Seval_noise(args.noise_var)
@@ -211,7 +215,8 @@ if __name__ == "__main__":
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
         STrain(args.fine_epoch, header_timer, args.verbose)
 
-        torch.save(model.state_dict(), f"saved_A_{header}_{header_timer}.pt")
+        if args.save_file:
+            torch.save(model.state_dict(), f"saved_A_{header}_{header_timer}.pt")
         fine_mask_acc_list = []
         print(f"Finetune no noise: {Seval():.4f}")
         loader = range(args.noise_epoch)
@@ -221,4 +226,5 @@ if __name__ == "__main__":
         print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
         model.clear_noise()
         GetSecond()
-        print(f"S grad after masking: {model.fetch_S_grad().item()}")
+        print(f"S grad after finetune: {model.fetch_S_grad().item():E}")
+        os.system(f"rm tmp_best_{header_timer}.pt")
