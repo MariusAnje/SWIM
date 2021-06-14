@@ -159,7 +159,9 @@ if __name__ == "__main__":
     model.push_S_device()
     model.clear_noise()
     model.clear_mask()
-    criteria = SCrossEntropyLoss()
+    model.to_fake()
+    # criteria = SCrossEntropyLoss()
+    criteria = torch.nn.CrossEntropyLoss()
 
     optimizer = optim.Adam(model.parameters(), lr=0.01)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
@@ -191,7 +193,7 @@ if __name__ == "__main__":
         no_mask_acc_list = torch.load(os.path.join(parent_path, f"no_mask_list_{header}.pt"))
         print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
 
-
+    model.back_real()
     state_dict = torch.load(os.path.join(parent_path, f"saved_B_{header}.pt"), map_location=device)
     model.load_state_dict(state_dict)
     model.clear_noise()
