@@ -18,6 +18,15 @@ class SCrossEntropyLoss(nn.Module):
         output = self.function.apply(input, inputS, labels, self.weight, self.size_average, self.ignore_index, self.reduce, self.reduction)
         return output
 
+class FakeSCrossEntropyLoss(nn.Module):
+    def __init__(self, weight=None, size_average=None, ignore_index=-100, reduce=None, reduction='mean'):
+        super().__init__()
+        self.op = nn.CrossEntropyLoss(weight, size_average, ignore_index, reduce, reduction)
+    
+    def forward(self, input, inputS, labels):
+        output = self.op(input, labels)
+        return output
+
 class Model(nn.Module):
     def __init__(self):
         super().__init__()
@@ -98,7 +107,9 @@ class SLeNet(SModel):
         x, xS = self.relu(x, xS)
         x, xS = self.pool(x, xS)
         
-        x, xS = x.view(-1, self.num_flat_features(x)), xS.view(-1, self.num_flat_features(xS))
+        x = x.view(-1, self.num_flat_features(x))
+        if xS is not None:
+            xS = xS.view(-1, self.num_flat_features(xS))
         
         x, xS = self.fc1(x, xS)
         x, xS = self.relu(x, xS)

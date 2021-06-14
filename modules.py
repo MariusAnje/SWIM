@@ -72,16 +72,16 @@ class SConv2d(SModule):
 class SReLU(nn.Module):
     def __init__(self):
         super().__init__()
-        self.relu = nn.ReLU()
+        self.op = nn.ReLU()
     
     def forward(self, x, xS):
-        return self.relu(x), self.relu(xS)
+        return self.op(x), self.op(xS)
 
 class SMaxpool2D(nn.Module):
     def __init__(self, kernel_size, stride=None, padding=0, dilation=1, return_indices=False, ceil_mode=False):
         super().__init__()
         return_indices = True
-        self.pool = nn.MaxPool2d(kernel_size, stride, padding, dilation, return_indices, ceil_mode)
+        self.op = nn.MaxPool2d(kernel_size, stride, padding, dilation, return_indices, ceil_mode)
     
     def parse_indice(self, indice):
         bs, ch, w, h = indice.shape
@@ -93,11 +93,21 @@ class SMaxpool2D(nn.Module):
 
     
     def forward(self, x, xS):
-        x, indices = self.pool(x)
+        x, indices = self.op(x)
         shape, indices = self.parse_indice(indices)
         xS = xS.view(shape)[indices].view(x.shape)
         return x, xS
 
+class FakeSModule(nn.Module):
+    def __init__(self, op):
+        super().__init__()
+        self.op = op
+        if isinstance(self.op, nn.MaxPool2d):
+            self.op.return_indices = False
+    
+    def forward(self, x, xS):
+        x = self.op(x)
+        return x, None
 
 class SModel(nn.Module):
     def __init__(self):
@@ -156,3 +166,40 @@ class SModel(nn.Module):
         for m in self.modules():
             if isinstance(m, SLinear) or isinstance(m, SConv2d):
                 m.clear_mask()
+    
+    def to_fake(self):
+        for name, m in self.named_modules():
+            if isinstance(m, SLinear) or isinstance(m, SConv2d) or isinstance(m, SMaxpool2D) or isinstance(m, SReLU):
+                new = FakeSModule(m.op)
+                self._modules[name] = new
+    
+    def back_real(self):
+        for name, m in self.named_modules():
+            if isinstance(m, FakeSModule):
+                if isinstance(m.op, nn.Linear):
+                    if m.op.bias is not None:
+                        bias = True
+                    new = SLinear(m.op.in_features, m.op.out_features, bias)
+                    new.op = m.op
+                    self._modules[name] = new
+
+                elif isinstance(m.op, nn.Conv2d):
+                    if m.op.bias is not None:
+                        bias = True
+                    new = SConv2d(m.op.in_channels, m.op.out_channels, m.op.kernel_size, m.op.stride, m.op.padding, m.op.dilation, m.op.groups, bias, m.op.padding_mode)
+                    new.op = m.op
+                    self._modules[name] = new
+
+                elif isinstance(m.op, nn.MaxPool2d):
+                    new = SMaxpool2D(m.op.kernel_size, m.op.stride, m.op.padding, m.op.dilation, m.op.return_indices, m.op.ceil_mode)
+                    new.op = m.op
+                    new.op.return_indices = True
+                    self._modules[name] = new
+
+                elif isinstance(m.op, nn.ReLU):
+                    new = SReLU()
+                    new.op = m.op
+                    self._modules[name] = new
+
+                else:
+                    raise NotImplementedError
