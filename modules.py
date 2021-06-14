@@ -66,7 +66,7 @@ class SConv2d(SModule):
         self.function = SConv2dFunction.apply
 
     def forward(self, x, xS):
-        x, xS = self.function(x, xS, (self.op.weight + self.noise) * self.mask, self.weightS, self.op.bias, self.op.padding, self.op.dilation, self.op.groups)
+        x, xS = self.function(x, xS, (self.op.weight + self.noise) * self.mask, self.weightS, self.op.bias, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
         return x, xS
 
 class SReLU(nn.Module):

@@ -141,3 +141,4 @@ cython_debug/
 *.pt
 *.o*
 Train.job
+test_mask.ipynb

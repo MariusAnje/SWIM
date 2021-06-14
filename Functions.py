@@ -73,9 +73,10 @@ class SConv2dFunction(autograd.Function):
     @staticmethod
     def backward(ctx, grad_output, grad_outputS):
         input, weight, bias, padding = ctx.saved_tensors
-        col_image = F.unfold(input,(3,3)).transpose(1,2)
-        bs, channels, ow, oh = grad_output.shape
         oc, ic, kw, kh = weight.shape
+        col_image = F.unfold(input,(kw,kh)).transpose(1,2)
+        bs, channels, ow, oh = grad_output.shape
+        
         # col_grad_output = grad_output.view(bs, channels, -1)
         grad_w = grad_output.view(bs, channels, -1).bmm(col_image).sum(dim=0).view(weight.shape)
         grad_wS = grad_outputS.view(bs, channels, -1).bmm(col_image**2).sum(dim=0).view(weight.shape) # SSSS
