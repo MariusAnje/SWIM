@@ -205,6 +205,8 @@ if __name__ == "__main__":
         print(f"with mask no noise: {Seval():.4f}")
         # GetSecond()
         print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
+        GetSecond()
+        print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
         # loader = range(args.noise_epoch)
         # for _ in loader:
         #     acc = Seval_noise(args.noise_var)
