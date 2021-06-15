@@ -135,7 +135,7 @@ if __name__ == "__main__":
     header_timer = header
     parent_path = "./"
     
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device(args.device if torch.cuda.is_available() else "cpu")
 
     BS = 128
 
