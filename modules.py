@@ -20,9 +20,8 @@ class SModule(nn.Module):
     
     def set_mask(self, portion, mode):
         if mode == "portion":
-            th = len(self.weightS.view(-1)) * (1-portion)
-            self.mask = self.weightS.view(-1).sort()[1].view(self.weightS.size()) <= th
-            self.mask = self.mask.to(torch.float)
+            th = self.weightS.grad.abs().view(-1).quantile(1-portion)
+            self.mask = (self.weightS.grad.data.abs() <= th).to(torch.float)
         elif mode == "th":
             self.mask = (self.weightS.grad.data.abs() <= portion).to(torch.float)
         else:
