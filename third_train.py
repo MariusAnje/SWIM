@@ -57,7 +57,7 @@ def Teval_noise(var):
             total += len(correction)
     return (correct/total).cpu().numpy()
 
-def TTrain(epochs, header, verbose=False):
+def TTrain(epochs, alpha, header, verbose=False):
     best_acc = 0.0
     for i in range(epochs):
         running_loss = 0.
@@ -70,7 +70,7 @@ def TTrain(epochs, header, verbose=False):
             loss = criteria(outputs, outputsT,labels)
             running_loss += loss.data
             loss.backward()
-            model.do_third(args.alpha)
+            model.do_third(alpha)
             optimizer.step()
         test_acc = Teval()
         if test_acc > best_acc:
@@ -166,7 +166,13 @@ if __name__ == "__main__":
 
     optimizer = optim.Adam(model.parameters(), lr=0.01)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
-    TTrain(args.train_epoch, header, args.verbose)
+    if args.pretrained:
+        state_dict = torch.load("saved_B_third.pt", map_location = device)
+        model.load_state_dict(state_dict)
+    else:
+        TTrain(args.train_epoch, 0, header, args.verbose)
+        # os.system(f"mv tmp_best_{header}.pt saved_B_third.pt")
+    TTrain(args.train_epoch, args.alpha, header, args.verbose)
 
     
     # if not args.pretrained:
