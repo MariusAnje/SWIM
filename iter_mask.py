@@ -180,20 +180,6 @@ if __name__ == "__main__":
     # model_S_information()
     ori_acc = Seval()
     print(ori_acc)
-    layer = model.fc2
-    indexes = torch.randint(0,1024,[args.num_mask]).numpy()
-    print(indexes)
-    P = layer.mask.view(-1)
-    P[indexes] *= 0
-    layer.mask = P.view(layer.mask.shape)
-    new_acc = Seval()
-    print(new_acc, new_acc - ori_acc)
-    print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
-    GetSecond()
-    print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
-    model_S_information()
-    print(layer.weightS.grad.data.view(-1)[indexes].cpu().numpy())
-    print(layer.op.weight.data.view(-1)[indexes].cpu().numpy())
     mask_acc_list = []
     for _ in range(args.num_noise):
         acc = Seval_noise(0.2)
@@ -203,3 +189,26 @@ if __name__ == "__main__":
     print(f"max: {np.max(mask_acc_list)}")
     print(f"min: {np.min(mask_acc_list)}")
     print(f"std: {np.std(mask_acc_list)}")
+    # layer = model.fc2
+    # indexes = torch.randint(0,1024,[args.num_mask]).numpy()
+    # print(indexes)
+    # P = layer.mask.view(-1)
+    # P[indexes] *= 0
+    # layer.mask = P.view(layer.mask.shape)
+    # new_acc = Seval()
+    # print(new_acc, new_acc - ori_acc)
+    # print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
+    # GetSecond()
+    # print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
+    # model_S_information()
+    # print(layer.weightS.grad.data.view(-1)[indexes].cpu().numpy())
+    # print(layer.op.weight.data.view(-1)[indexes].cpu().numpy())
+    # mask_acc_list = []
+    # for _ in range(args.num_noise):
+    #     acc = Seval_noise(0.2)
+    #     mask_acc_list.append(acc)
+    
+    # print(f"mean: {np.mean(mask_acc_list)}")
+    # print(f"max: {np.max(mask_acc_list)}")
+    # print(f"min: {np.min(mask_acc_list)}")
+    # print(f"std: {np.std(mask_acc_list)}")
