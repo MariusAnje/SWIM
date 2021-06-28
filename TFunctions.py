@@ -167,7 +167,7 @@ class TCrossEntropyLossFunction(autograd.Function):
         grad_input = (ratio - grad_input_mask)/len(input)
         # grad_inputT = (exp_sum - exp) * exp / (exp_sum ** 2)
         # grad_input = (ratio - grad_input_mask)/len(input)
-        grad_inputT = (1 - ratio) * ratio * (3 * ratio - 2)
+        grad_inputT = (1 - ratio) * ratio * (2 * ratio - 1)
         
         test_nan(exp, exp_sum, grad_input, grad_inputT, ratio)
 
