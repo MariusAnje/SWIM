@@ -178,7 +178,7 @@ class SModel(nn.Module):
                     sail_list = torch.cat([sail_list, sail])
         th = torch.quantile(sail_list, 1-quantile)
         # print(th)
-        return th, sail_list
+        return th
 
     def set_noise(self, var):
         for m in self.modules():
