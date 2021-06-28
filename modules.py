@@ -36,6 +36,16 @@ class SModule(nn.Module):
         else:
             raise NotImplementedError(f"Mode: {mode} not supported, only support mode portion & th, ")
     
+    def set_mask_sail(self, portion, mode):
+        saliency = self.weightS.grad.abs() * (self.op.weight.data ** 2)
+        if mode == "portion":
+            th = saliency.view(-1).quantile(1-portion)
+            self.mask = (saliency <= th).to(torch.float)
+        elif mode == "th":
+            self.mask = (saliency <= portion).to(torch.float)
+        else:
+            raise NotImplementedError(f"Mode: {mode} not supported, only support mode portion & th, ")
+    
     def clear_mask(self):
         self.mask = torch.ones_like(self.op.weight)
 
@@ -156,6 +166,19 @@ class SModel(nn.Module):
         th = torch.quantile(S_grad_list, 1-quantile)
         # print(th)
         return th
+    
+    def calc_sail_th(self, quantile):
+        sail_list = None
+        for m in self.modules():
+            if isinstance(m, SLinear) or isinstance(m, SConv2d):
+                sail = (m.fetch_S_grad_list().abs() * (m.op.weight.data**2)).view(-1)
+                if sail_list is None:
+                    sail_list = sail
+                else:
+                    sail_list = torch.cat([sail_list, sail])
+        th = torch.quantile(sail_list, 1-quantile)
+        # print(th)
+        return th, sail_list
 
     def set_noise(self, var):
         for m in self.modules():
@@ -176,6 +199,11 @@ class SModel(nn.Module):
         for m in self.modules():
             if isinstance(m, SLinear) or isinstance(m, SConv2d):
                 m.set_mask_mag(th, mode)
+    
+    def set_mask_sail(self, th, mode):
+        for m in self.modules():
+            if isinstance(m, SLinear) or isinstance(m, SConv2d):
+                m.set_mask_sail(th, mode)
     
     def clear_mask(self):
         for m in self.modules():
