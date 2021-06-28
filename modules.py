@@ -27,6 +27,15 @@ class SModule(nn.Module):
         else:
             raise NotImplementedError(f"Mode: {mode} not supported, only support mode portion & th, ")
     
+    def set_mask_mag(self, portion, mode):
+        if mode == "portion":
+            th = self.op.weight.abs().view(-1).quantile(1-portion)
+            self.mask = (self.op.weight.data.abs() <= th).to(torch.float)
+        elif mode == "th":
+            self.mask = (self.op.weight.data.abs() <= portion).to(torch.float)
+        else:
+            raise NotImplementedError(f"Mode: {mode} not supported, only support mode portion & th, ")
+    
     def clear_mask(self):
         self.mask = torch.ones_like(self.op.weight)
 
@@ -162,6 +171,11 @@ class SModel(nn.Module):
         for m in self.modules():
             if isinstance(m, SLinear) or isinstance(m, SConv2d):
                 m.set_mask(th, mode)
+    
+    def set_mask_mag(self, th, mode):
+        for m in self.modules():
+            if isinstance(m, SLinear) or isinstance(m, SConv2d):
+                m.set_mask_mag(th, mode)
     
     def clear_mask(self):
         for m in self.modules():
