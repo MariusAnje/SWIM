@@ -96,7 +96,9 @@ class SReLU(nn.Module):
         self.op = nn.ReLU()
     
     def forward(self, x, xS):
-        return self.op(x), self.op(xS)
+        with torch.no_grad():
+            mask = (x > 0).to(torch.float)
+        return self.op(x), xS * mask
 
 class SMaxpool2D(nn.Module):
     def __init__(self, kernel_size, stride=None, padding=0, dilation=1, return_indices=False, ceil_mode=False):
