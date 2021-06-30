@@ -37,8 +37,8 @@ class SModule(nn.Module):
             raise NotImplementedError(f"Mode: {mode} not supported, only support mode portion & th, ")
     
     def set_mask_sail(self, portion, mode):
-        saliency = self.weightS.grad.abs() * (self.op.weight.data ** 2)
-        # saliency = self.weightS.grad.abs() / (self.op.weight.data ** 2 + 1e-8)
+        # saliency = self.weightS.grad.abs() * (self.op.weight.data ** 2)
+        saliency = self.weightS.grad.abs() / (self.op.weight.data ** 2 + 1e-8)
         if mode == "portion":
             th = saliency.view(-1).quantile(1-portion)
             self.mask = (saliency <= th).to(torch.float)
@@ -174,8 +174,8 @@ class SModel(nn.Module):
         sail_list = None
         for m in self.modules():
             if isinstance(m, SLinear) or isinstance(m, SConv2d):
-                sail = (m.fetch_S_grad_list().abs() * (m.op.weight.data**2)).view(-1)
-                # sail = (m.fetch_S_grad_list().abs() / (m.op.weight.data**2 + 1e-8)).view(-1)
+                # sail = (m.fetch_S_grad_list().abs() * (m.op.weight.data**2)).view(-1)
+                sail = (m.fetch_S_grad_list().abs() / (m.op.weight.data**2 + 1e-8)).view(-1)
                 if sail_list is None:
                     sail_list = sail
                 else:
