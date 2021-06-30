@@ -190,7 +190,7 @@ if __name__ == "__main__":
     else:
         parent_path = args.model_path
         header = args.header
-        no_mask_acc_list = torch.load(os.path.join(parent_path, f"no_mask_list_{header}.pt"))
+        no_mask_acc_list = torch.load(os.path.join(parent_path, f"no_mask_list_{header}_{args.noise_var}.pt"))
         print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
         model.back_real(device)
         model.push_S_device()

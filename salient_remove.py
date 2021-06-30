@@ -128,7 +128,7 @@ if __name__ == "__main__":
             help='see training process')
     parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet"],
             help='model to use')
-    parser.add_argument('--header', action='store',type=int, default=0,
+    parser.add_argument('--header', action='store',type=int, default=1,
             help='use which saved state dict')
     parser.add_argument('--pretrained', action='store',type=str2bool, default=True,
             help='if to use pretrained model')
@@ -184,6 +184,16 @@ if __name__ == "__main__":
         state_dict = torch.load(f"tmp_best_{header}.pt")
         model.load_state_dict(state_dict)
         torch.save(model.state_dict(), f"saved_B_{header}.pt")
+    
+    # else:
+    #     header = args.header
+    #     parent_path = args.model_path
+    #     model.back_real(device)
+    #     model.push_S_device()
+    #     state_dict = torch.load(os.path.join(parent_path, f"saved_B_{header}.pt"), map_location=device)
+    #     model.load_state_dict(state_dict)
+
+
 
         no_mask_acc_list = []
         state_dict = torch.load(f"saved_B_{header}.pt")
@@ -195,12 +205,13 @@ if __name__ == "__main__":
             acc = Seval_noise(args.noise_var)
             no_mask_acc_list.append(acc)
         print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
-        torch.save(no_mask_acc_list, f"no_mask_list_{header}.pt")
-    
+        torch.save(no_mask_acc_list, f"no_mask_list_{header}_{args.noise_var}.pt")
+
+        # exit()
     else:
         parent_path = args.model_path
         header = args.header
-        no_mask_acc_list = torch.load(os.path.join(parent_path, f"no_mask_list_{header}.pt"))
+        no_mask_acc_list = torch.load(os.path.join(parent_path, f"no_mask_list_{header}_{args.noise_var}.pt"))
         print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
         model.back_real(device)
         model.push_S_device()
