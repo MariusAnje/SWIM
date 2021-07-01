@@ -18,6 +18,20 @@ class SModule(nn.Module):
     def clear_noise(self):
         self.noise = torch.zeros_like(self.op.weight)
     
+    def mask_indicator(self, method, alpha=None):
+        if method == "second":
+            return self.weightS.grad.data.abs()
+        if method == "magnitude":
+            return self.op.weight.data.abs()
+        if method == "saliency":
+            return self.weightS.grad.data.abs() * (self.op.weight.data ** 2)
+        if method == "r_saliency":
+            return self.weightS.grad.abs() / (self.op.weight.data ** 2 + 1e-8)
+        if method == "substract":
+            return self.weightS.grad.data.abs() - alpha * self.weightS.grad.data.abs() * (self.op.weight.data ** 2)
+        else:
+            raise NotImplementedError(f"method {method} not supported")
+
     def set_mask(self, portion, mode):
         if mode == "portion":
             th = self.weightS.grad.abs().view(-1).quantile(1-portion)
@@ -36,9 +50,8 @@ class SModule(nn.Module):
         else:
             raise NotImplementedError(f"Mode: {mode} not supported, only support mode portion & th, ")
     
-    def set_mask_sail(self, portion, mode):
-        # saliency = self.weightS.grad.abs() * (self.op.weight.data ** 2)
-        saliency = self.weightS.grad.abs() / (self.op.weight.data ** 2 + 1e-8)
+    def set_mask_sail(self, portion, mode, method, alpha=None):
+        saliency = self.mask_indicator(method, alpha)
         if mode == "portion":
             th = saliency.view(-1).quantile(1-portion)
             self.mask = (saliency <= th).to(torch.float)
@@ -170,12 +183,11 @@ class SModel(nn.Module):
         # print(th)
         return th
     
-    def calc_sail_th(self, quantile):
+    def calc_sail_th(self, quantile, method, alpha=None):
         sail_list = None
         for m in self.modules():
             if isinstance(m, SLinear) or isinstance(m, SConv2d):
-                # sail = (m.fetch_S_grad_list().abs() * (m.op.weight.data**2)).view(-1)
-                sail = (m.fetch_S_grad_list().abs() / (m.op.weight.data**2 + 1e-8)).view(-1)
+                sail = m.mask_indicator(method, alpha).view(-1)
                 if sail_list is None:
                     sail_list = sail
                 else:
@@ -204,10 +216,10 @@ class SModel(nn.Module):
             if isinstance(m, SLinear) or isinstance(m, SConv2d):
                 m.set_mask_mag(th, mode)
     
-    def set_mask_sail(self, th, mode):
+    def set_mask_sail(self, th, mode, method, alpha=None):
         for m in self.modules():
             if isinstance(m, SLinear) or isinstance(m, SConv2d):
-                m.set_mask_sail(th, mode)
+                m.set_mask_sail(th, mode, method, alpha)
     
     def clear_mask(self):
         for m in self.modules():
