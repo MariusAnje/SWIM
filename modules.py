@@ -27,7 +27,7 @@ class SModule(nn.Module):
             return self.weightS.grad.data.abs() * (self.op.weight.data ** 2)
         if method == "r_saliency":
             return self.weightS.grad.abs() / (self.op.weight.data ** 2 + 1e-8)
-        if method == "substract":
+        if method == "subtract":
             return self.weightS.grad.data.abs() - alpha * self.weightS.grad.data.abs() * (self.op.weight.data ** 2)
         else:
             raise NotImplementedError(f"method {method} not supported")

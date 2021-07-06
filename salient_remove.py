@@ -128,6 +128,10 @@ if __name__ == "__main__":
             help='see training process')
     parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet"],
             help='model to use')
+    parser.add_argument('--method', action='store', default="second", choices=["second", "magnitude", "saliency", "r_saliency", "subtract"],
+            help='method used to calculate saliency')
+    parser.add_argument('--alpha', action='store', type=float, default=1.0,
+            help='weight used in saliency - substract')
     parser.add_argument('--header', action='store',type=int, default=1,
             help='use which saved state dict')
     parser.add_argument('--pretrained', action='store',type=str2bool, default=True,
@@ -230,9 +234,8 @@ if __name__ == "__main__":
     
     if args.use_mask:
         mask_acc_list = []
-        th = model.calc_sail_th(args.mask_p)
-        model.set_mask_sail(th, mode="th")
-        # print(mask_por())
+        th = model.calc_sail_th(args.mask_p, args.method, args.alpha)
+        model.set_mask_sail(th, "th", args.method, args.alpha)
         print(f"with mask no noise: {Seval():.4f}")
         # GetSecond()
         print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
