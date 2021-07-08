@@ -13,7 +13,7 @@ class SModule(nn.Module):
         self.mask = torch.ones_like(self.op.weight)
 
     def set_noise(self, var):
-        self.noise = torch.normal(mean=0., std=var, size=self.noise.size()).to(self.op.weight.device)
+        self.noise = torch.normal(mean=0., std=var, size=self.noise.size()).to(self.op.weight.device) 
     
     def clear_noise(self):
         self.noise = torch.zeros_like(self.op.weight)
