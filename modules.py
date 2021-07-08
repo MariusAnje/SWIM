@@ -22,11 +22,15 @@ class SModule(nn.Module):
         if method == "second":
             return self.weightS.grad.data.abs()
         if method == "magnitude":
-            return self.op.weight.data.abs()
+            return 1 / (self.op.weight.data.abs() + 1e-8)
         if method == "saliency":
-            return self.weightS.grad.data.abs() * (self.op.weight.data ** 2)
+            if alpha is None:
+                alpha = 2
+            return self.weightS.grad.data.abs() * (self.op.weight.data ** alpha).abs()
         if method == "r_saliency":
-            return self.weightS.grad.abs() / (self.op.weight.data ** 2 + 1e-8)
+            if alpha is None:
+                alpha = 2
+            return self.weightS.grad.abs() / (self.op.weight.data ** alpha + 1e-8).abs()
         if method == "subtract":
             return self.weightS.grad.data.abs() - alpha * self.weightS.grad.data.abs() * (self.op.weight.data ** 2)
         else:
