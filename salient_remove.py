@@ -3,7 +3,7 @@ import torchvision
 from torch import optim
 import torchvision.transforms as transforms
 import numpy as np
-from models import SCrossEntropyLoss, SMLP3, SMLP4, SLeNet, FakeSCrossEntropyLoss
+from models import SCrossEntropyLoss, SMLP3, SMLP4, SLeNet, CIFAR, FakeSCrossEntropyLoss
 from modules import SModule
 from tqdm import tqdm
 import time
@@ -126,7 +126,7 @@ if __name__ == "__main__":
             help='device used')
     parser.add_argument('--verbose', action='store', type=str2bool, default=False,
             help='see training process')
-    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet"],
+    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR"],
             help='model to use')
     parser.add_argument('--method', action='store', default="second", choices=["second", "magnitude", "saliency", "r_saliency", "subtract"],
             help='method used to calculate saliency')
@@ -153,21 +153,42 @@ if __name__ == "__main__":
 
     BS = 128
 
-    trainset = torchvision.datasets.MNIST(root='~/Private/data', train=True,
-                                            download=False, transform=transforms.ToTensor())
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS,
-                                            shuffle=True, num_workers=2)
+    if args.model != "CIFAR":
+        trainset = torchvision.datasets.MNIST(root='~/Private/data', train=True,
+                                                download=False, transform=transforms.ToTensor())
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS,
+                                                shuffle=True, num_workers=2)
 
-    testset = torchvision.datasets.MNIST(root='~/Private/data', train=False,
-                                        download=False, transform=transforms.ToTensor())
-    testloader = torch.utils.data.DataLoader(testset, batch_size=BS,
-                                                shuffle=False, num_workers=2)
+        testset = torchvision.datasets.MNIST(root='~/Private/data', train=False,
+                                            download=False, transform=transforms.ToTensor())
+        testloader = torch.utils.data.DataLoader(testset, batch_size=BS,
+                                                    shuffle=False, num_workers=2)
+    else:
+        normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
+        transform = transforms.Compose(
+        [transforms.ToTensor(),
+        #  transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+            normalize])
+        train_transform = transforms.Compose([
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomCrop(32, 4),
+                transforms.ToTensor(),
+                normalize,
+                ])
+        trainset = torchvision.datasets.CIFAR10(root='~/Private/data', train=True, download=True, transform=train_transform)
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS, shuffle=True, num_workers=4)
+        testset = torchvision.datasets.CIFAR10(root='~/Private/data', train=False, download=True, transform=transform)
+        testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=4)
+
+
     if args.model == "MLP3":
         model = SMLP3()
     elif args.model == "MLP4":
         model = SMLP4()
     elif args.model == "LeNet":
         model = SLeNet()
+    elif args.model == "CIFAR":
+        model = CIFAR()
 
     model.to(device)
     model.push_S_device()
