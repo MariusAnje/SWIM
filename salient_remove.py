@@ -175,9 +175,9 @@ if __name__ == "__main__":
                 transforms.ToTensor(),
                 normalize,
                 ])
-        trainset = torchvision.datasets.CIFAR10(root='~/Private/data', train=True, download=True, transform=train_transform)
+        trainset = torchvision.datasets.CIFAR10(root='~/Private/data', train=True, download=False, transform=train_transform)
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS, shuffle=True, num_workers=4)
-        testset = torchvision.datasets.CIFAR10(root='~/Private/data', train=False, download=True, transform=transform)
+        testset = torchvision.datasets.CIFAR10(root='~/Private/data', train=False, download=False, transform=transform)
         testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=4)
 
 
@@ -198,8 +198,11 @@ if __name__ == "__main__":
     # criteria = SCrossEntropyLoss()
     criteria = FakeSCrossEntropyLoss()
 
-    optimizer = optim.Adam(model.parameters(), lr=0.01)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
+    # optimizer = optim.Adam(model.parameters(), lr=0.01)
+    # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
+
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [60])
     if not args.pretrained:
         STrain(args.train_epoch, header, args.verbose)
 
@@ -218,13 +221,15 @@ if __name__ == "__main__":
     #     state_dict = torch.load(os.path.join(parent_path, f"saved_B_{header}.pt"), map_location=device)
     #     model.load_state_dict(state_dict)
 
-
-
         no_mask_acc_list = []
         state_dict = torch.load(f"saved_B_{header}.pt")
+        
+
         print(f"No mask no noise: {Seval():.4f}")
         model.load_state_dict(state_dict)
         model.clear_mask()
+        model.back_real(device)
+        model.push_S_device()
         loader = range(args.noise_epoch)
         for _ in loader:
             acc = Seval_noise(args.noise_var)
@@ -232,7 +237,7 @@ if __name__ == "__main__":
         print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
         torch.save(no_mask_acc_list, f"no_mask_list_{header}_{args.noise_var}.pt")
 
-        # exit()
+        exit()
     else:
         parent_path = args.model_path
         header = args.header
@@ -243,6 +248,8 @@ if __name__ == "__main__":
 
     
     state_dict = torch.load(os.path.join(parent_path, f"saved_B_{header}.pt"), map_location=device)
+    if args.model == "CIFAR":
+        model.to_fake(device)
     model.load_state_dict(state_dict)
     model.back_real(device)
     model.push_S_device()

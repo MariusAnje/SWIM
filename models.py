@@ -135,12 +135,12 @@ class CIFAR(SModel):
         self.conv2 = SConv2d(64, 64, 3, padding=1)
         self.pool1 = SMaxpool2D(2,2)
 
-        self.conv3 = SConv2d(64,128,3)
-        self.conv4 = SConv2d(128,128,3)
+        self.conv3 = SConv2d(64,128,3, padding=1)
+        self.conv4 = SConv2d(128,128,3, padding=1)
         self.pool2 = SMaxpool2D(2,2)
 
-        self.conv5 = SConv2d(128,256,3)
-        self.conv6 = SConv2d(256,256,3)
+        self.conv5 = SConv2d(128,256,3, padding=1)
+        self.conv6 = SConv2d(256,256,3, padding=1)
         self.pool3 = SMaxpool2D(2,2)
         
         self.fc1 = SLinear(256 * 4 * 4, 1024)
