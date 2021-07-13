@@ -143,3 +143,5 @@ cython_debug/
 *.svg
 Train.job
 test_mask.ipynb
+
+*.DS_Store*
