@@ -126,3 +126,62 @@ class SLeNet(SModel):
         for s in size:
             num_features *= s
         return num_features
+
+class CIFAR(SModel):
+    def __init__(self):
+        super().__init__()
+
+        self.conv1 = SConv2d(3, 64, 3, padding=1)
+        self.conv2 = SConv2d(64, 64, 3, padding=1)
+        self.pool1 = SMaxpool2D(2,2)
+
+        self.conv3 = SConv2d(64,128,3)
+        self.conv4 = SConv2d(128,128,3)
+        self.pool2 = SMaxpool2D(2,2)
+
+        self.conv5 = SConv2d(128,256,3)
+        self.conv6 = SConv2d(256,256,3)
+        self.pool3 = SMaxpool2D(2,2)
+        
+        self.fc1 = SLinear(256 * 4 * 4, 1024)
+        self.fc2 = SLinear(1024, 1024)
+        self.fc3 = SLinear(1024, 10)
+        self.relu = SReLU()
+
+    def forward(self, x):
+        xS = torch.zeros_like(x)
+        x, xS = self.conv1(x, xS)
+        x, xS = self.relu(x, xS)
+        x, xS = self.conv2(x, xS)
+        x, xS = self.relu(x, xS)
+        x, xS = self.pool1(x, xS)
+
+        x, xS = self.conv3(x, xS)
+        x, xS = self.relu(x, xS)
+        x, xS = self.conv4(x, xS)
+        x, xS = self.relu(x, xS)
+        x, xS = self.pool2(x, xS)
+
+        x, xS = self.conv5(x, xS)
+        x, xS = self.relu(x, xS)
+        x, xS = self.conv6(x, xS)
+        x, xS = self.relu(x, xS)
+        x, xS = self.pool3(x, xS)
+        
+        x = x.view(-1, self.num_flat_features(x))
+        if xS is not None:
+            xS = xS.view(-1, self.num_flat_features(xS))
+        
+        x, xS = self.fc1(x, xS)
+        x, xS = self.relu(x, xS)
+        x, xS = self.fc2(x, xS)
+        x, xS = self.relu(x, xS)
+        x, xS = self.fc3(x, xS)
+        return x, xS
+
+    def num_flat_features(self, x):
+        size = x.size()[1:]  # all dimensions except the batch dimension
+        num_features = 1
+        for s in size:
+            num_features *= s
+        return num_features
