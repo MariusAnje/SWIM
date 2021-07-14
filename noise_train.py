@@ -60,7 +60,7 @@ def NEachEval(var):
 
 def NTrain(epochs, header, var, verbose=False):
     best_acc = 0.0
-    for i in tqdm(range(epochs)):
+    for i in range(epochs):
         running_loss = 0.
         for images, labels in trainloader:
             model.clear_noise()
