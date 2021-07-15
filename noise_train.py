@@ -78,7 +78,7 @@ def NTrain(epochs, header, var, verbose=False):
             best_acc = test_acc
             torch.save(model.state_dict(), f"tmp_best_{header}.pt")
         if verbose:
-            print(f"epoch: {i:-3d}, test acc: {test_acc:.4f}, loss: {running_loss / len(trainloader):.4f}, s: {(running_l - running_loss) / len(trainloader):-5.4f}")
+            print(f"epoch: {i:-3d}, test acc: {test_acc:.4f}, loss: {running_loss / len(trainloader):.4f}")
         scheduler.step()
 
 def str2bool(a):
