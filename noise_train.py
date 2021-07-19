@@ -81,6 +81,16 @@ def NTrain(epochs, header, var, verbose=False):
             print(f"epoch: {i:-3d}, test acc: {test_acc:.4f}, loss: {running_loss / len(trainloader):.4f}")
         scheduler.step()
 
+def GetSecond():
+    model.clear_noise()
+    optimizer.zero_grad()
+    for images, labels in trainloader:
+        images, labels = images.to(device), labels.to(device)
+        # images = images.view(-1, 784)
+        outputs, outputsS = model(images)
+        loss = criteria(outputs, outputsS,labels)
+        loss.backward()
+
 def str2bool(a):
     if a == "True":
         return True
@@ -100,16 +110,24 @@ if __name__ == "__main__":
             help='# of epochs of noise validations')
     parser.add_argument('--noise_var', action='store', type=float, default=0.1,
             help='noise variation')
+    parser.add_argument('--mask_p', action='store', type=float, default=0.01,
+            help='portion of the mask')
     parser.add_argument('--device', action='store', default="cuda:0",
             help='device used')
     parser.add_argument('--verbose', action='store', type=str2bool, default=False,
             help='see training process')
     parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR"],
             help='model to use')
+    parser.add_argument('--method', action='store', default="second", choices=["second", "magnitude", "saliency", "r_saliency", "subtract"],
+            help='method used to calculate saliency')
+    parser.add_argument('--alpha', action='store', type=float, default=1.0,
+            help='weight used in saliency - substract')
     parser.add_argument('--header', action='store',type=int, default=1,
             help='use which saved state dict')
     parser.add_argument('--pretrained', action='store',type=str2bool, default=True,
             help='if to use pretrained model')
+    parser.add_argument('--use_mask', action='store',type=str2bool, default=True,
+            help='if to do the masking experiment')
     parser.add_argument('--model_path', action='store', default="./pretrained",
             help='where you put the pretrained model')
     parser.add_argument('--save_file', action='store',type=str2bool, default=True,
@@ -166,14 +184,12 @@ if __name__ == "__main__":
     model.push_S_device()
     model.clear_noise()
     model.clear_mask()
-    model.to_fake(device)
-    # criteria = SCrossEntropyLoss()
-    criteria = FakeSCrossEntropyLoss()
+    criteria = SCrossEntropyLoss()
 
     # optimizer = optim.Adam(model.parameters(), lr=0.01)
     # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
 
-    optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [60])
     if not args.pretrained:
         NTrain(args.train_epoch, header, args.noise_var, args.verbose)
@@ -186,8 +202,6 @@ if __name__ == "__main__":
         print(f"No mask no noise: {CEval():.4f}")
         model.load_state_dict(state_dict)
         model.clear_mask()
-        model.back_real(device)
-        model.push_S_device()
         loader = range(args.noise_epoch)
         for _ in loader:
             acc = NEval(args.noise_var)
@@ -206,20 +220,45 @@ if __name__ == "__main__":
 
     
     state_dict = torch.load(os.path.join(parent_path, f"saved_B_{header}.pt"), map_location=device)
-    if args.model == "CIFAR":
-        model.to_fake(device)
     model.load_state_dict(state_dict)
     model.back_real(device)
     model.push_S_device()
     criteria = SCrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=1e-3)
+    optimizer = optim.Adam(model.parameters(), lr=0.01)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
-    NTrain(args.fine_epoch, header_timer, args.noise_var, args.verbose)
-    print(f"Finetune no noise: {CEval():.4f}")
-    fine_mask_acc_list = []
-    loader = range(args.noise_epoch)
-    for _ in loader:
-        acc = NEval(args.noise_var)
-        fine_mask_acc_list.append(acc)
-    print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
     model.clear_noise()
+    GetSecond()
+    print(f"S grad before masking: {model.fetch_S_grad().item():E}")
+    
+    if args.use_mask:
+        mask_acc_list = []
+        th = model.calc_sail_th(args.mask_p, args.method, args.alpha)
+        model.set_mask_sail(th, "th", args.method, args.alpha)
+        print(f"with mask no noise: {CEval():.4f}")
+        # GetSecond()
+        print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
+        GetSecond()
+        print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
+        # loader = range(args.noise_epoch)
+        # for _ in loader:
+        #     acc = Seval_noise(args.noise_var)
+        #     mask_acc_list.append(acc)
+        # print(f"With mask noise average acc: {np.mean(mask_acc_list):.4f}, std: {np.std(mask_acc_list):.4f}")
+        
+        optimizer = optim.SGD(model.parameters(), lr=1e-3)
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
+        NTrain(args.fine_epoch, header_timer, args.noise_var, args.verbose)
+
+        if args.save_file:
+            torch.save(model.state_dict(), f"saved_A_{header}_{header_timer}.pt")
+        fine_mask_acc_list = []
+        print(f"Finetune no noise: {CEval():.4f}")
+        loader = range(args.noise_epoch)
+        for _ in loader:
+            acc = NEval(args.noise_var)
+            fine_mask_acc_list.append(acc)
+        print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
+        model.clear_noise()
+        GetSecond()
+        print(f"S grad after finetune: {model.fetch_S_grad().item():E}")
+        os.system(f"rm tmp_best_{header_timer}.pt")
