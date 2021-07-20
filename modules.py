@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch import functional
 from torch._C import device
 from Functions import SLinearFunction, SConv2dFunction, SMSEFunction, SCrossEntropyLossFunction    
 
@@ -106,6 +107,35 @@ class SConv2d(SModule):
     def forward(self, x, xS):
         x, xS = self.function(x, xS, (self.op.weight + self.noise) * self.mask, self.weightS, self.op.bias, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
         return x, xS
+
+class NModule(nn.Module):
+    def set_noise(self, var):
+        self.noise = torch.normal(mean=0., std=var, size=self.noise.size()).to(self.op.weight.device) 
+    
+    def clear_noise(self):
+        self.noise = torch.zeros_like(self.op.weight)
+
+class NLinear(NModule):
+    def __init__(self, in_features, out_features, bias=True):
+        super().__init__()
+        self.op = nn.Linear(in_features, out_features, bias)
+        self.noise = torch.zeros_like(self.op.weight)
+        self.function = nn.functional.linear
+
+    def forward(self, x):
+        x = self.function(x, (self.op.weight + self.noise), self.op.bias)
+        return x
+
+class NConv2d(NModule):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros'):
+        super().__init__()
+        self.op = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, dilation, groups, bias, padding_mode)
+        self.noise = torch.zeros_like(self.op.weight)
+        self.function = nn.functional.conv2d
+
+    def forward(self, x):
+        x = self.function(x, (self.op.weight + self.noise), self.op.bias, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
+        return x
 
 class SReLU(nn.Module):
     def __init__(self):

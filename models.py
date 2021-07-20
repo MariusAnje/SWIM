@@ -185,3 +185,70 @@ class CIFAR(SModel):
         for s in size:
             num_features *= s
         return num_features
+
+from modules import NConv2d, NLinear
+class FakeCIFAR(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.conv1 = NConv2d(3, 64, 3, padding=1)
+        self.conv2 = NConv2d(64, 64, 3, padding=1)
+        self.pool1 = nn.MaxPool2d(2,2)
+
+        self.conv3 = NConv2d(64,128,3, padding=1)
+        self.conv4 = NConv2d(128,128,3, padding=1)
+        self.pool2 = nn.MaxPool2d(2,2)
+
+        self.conv5 = NConv2d(128,256,3, padding=1)
+        self.conv6 = NConv2d(256,256,3, padding=1)
+        self.pool3 = nn.MaxPool2d(2,2)
+        
+        self.fc1 = NLinear(256 * 4 * 4, 1024)
+        self.fc2 = NLinear(1024, 1024)
+        self.fc3 = NLinear(1024, 10)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.relu(x)
+        x = self.conv2(x)
+        x = self.relu(x)
+        x = self.pool1(x)
+
+        x = self.conv3(x)
+        x = self.relu(x)
+        x = self.conv4(x)
+        x = self.relu(x)
+        x = self.pool2(x)
+
+        x = self.conv5(x)
+        x = self.relu(x)
+        x = self.conv6(x)
+        x = self.relu(x)
+        x = self.pool3(x)
+        
+        x = x.view(-1, self.num_flat_features(x))
+        
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.fc2(x)
+        x = self.relu(x)
+        x = self.fc3(x)
+        return x
+
+    def num_flat_features(self, x):
+        size = x.size()[1:]  # all dimensions except the batch dimension
+        num_features = 1
+        for s in size:
+            num_features *= s
+        return num_features
+    
+    def set_noise(self, var):
+        for m in self.modules():
+            if isinstance(m, NLinear) or isinstance(m, NConv2d):
+                m.set_noise(var)
+    
+    def clear_noise(self):
+        for m in self.modules():
+            if isinstance(m, NLinear) or isinstance(m, NConv2d):
+                m.clear_noise()
