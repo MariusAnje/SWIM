@@ -132,6 +132,8 @@ if __name__ == "__main__":
             help='where you put the pretrained model')
     parser.add_argument('--save_file', action='store',type=str2bool, default=True,
             help='if to save the files')
+    parser.add_argument('--calc_S', action='store',type=str2bool, default=True,
+            help='if calculated S grad if not necessary')
     args = parser.parse_args()
 
     print(args)
@@ -237,8 +239,9 @@ if __name__ == "__main__":
         print(f"with mask no noise: {CEval():.4f}")
         # GetSecond()
         print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
-        GetSecond()
-        print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
+        if args.calc_S:
+            GetSecond()
+            print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
         # loader = range(args.noise_epoch)
         # for _ in loader:
         #     acc = Seval_noise(args.noise_var)
@@ -259,6 +262,7 @@ if __name__ == "__main__":
             fine_mask_acc_list.append(acc)
         print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
         model.clear_noise()
-        GetSecond()
-        print(f"S grad after finetune: {model.fetch_S_grad().item():E}")
+        if args.calc_S:
+            GetSecond()
+            print(f"S grad after finetune: {model.fetch_S_grad().item():E}")
         os.system(f"rm tmp_best_{header_timer}.pt")
