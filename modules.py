@@ -21,7 +21,7 @@ class SModule(nn.Module):
         noise = torch.zeros_like(self.noise).to(self.op.weight.device)
         scale = self.op.weight.abs().max()
         for i in range(1, N//m + 1):
-            noise += torch.normal(mean=0., std=var, size=self.noise.size()) * (pow(2, - i*m))
+            noise += (torch.normal(mean=0., std=var, size=self.noise.size()) * (pow(2, - i*m))).to(self.op.weight.device)
         self.noise = noise.to(self.op.weight.device) * scale
     
     def clear_noise(self):
