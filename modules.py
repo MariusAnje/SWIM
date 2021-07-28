@@ -13,8 +13,16 @@ class SModule(nn.Module):
         self.noise = torch.zeros_like(self.op.weight)
         self.mask = torch.ones_like(self.op.weight)
 
-    def set_noise(self, var):
-        self.noise = torch.normal(mean=0., std=var, size=self.noise.size()).to(self.op.weight.device) 
+    # def set_noise(self, var):
+        # self.noise = torch.normal(mean=0., std=var, size=self.noise.size()).to(self.op.weight.device) 
+    
+    def set_noise(self, var, N, m):
+        # N: number of bits per weight, m: number of bits per device
+        noise = torch.zeros_like(self.noise)
+        scale = self.op.weight.abs().max()
+        for i in range(1, N//m + 1):
+            noise += torch.normal(mean=0., std=var, size=self.noise.size()) * (pow(2, - i*m))
+        self.noise = noise.to(self.op.weight.device) * scale
     
     def clear_noise(self):
         self.noise = torch.zeros_like(self.op.weight)
@@ -109,8 +117,14 @@ class SConv2d(SModule):
         return x, xS
 
 class NModule(nn.Module):
-    def set_noise(self, var):
-        self.noise = torch.normal(mean=0., std=var, size=self.noise.size()).to(self.op.weight.device) 
+    # def set_noise(self, var):
+    #     self.noise = torch.normal(mean=0., std=var, size=self.noise.size()).to(self.op.weight.device) 
+    def set_noise(self, var, N, m):
+        noise = torch.zeros_like(self.noise)
+        scale = self.op.weight.abs().max()
+        for i in range(1, N//m + 1):
+            noise += torch.normal(mean=0., std=var, size=self.noise.size()) * (pow(2, - i*m))
+        self.noise = noise.to(self.op.weight.device) * scale
     
     def clear_noise(self):
         self.noise = torch.zeros_like(self.op.weight)
@@ -230,10 +244,11 @@ class SModel(nn.Module):
         # print(th)
         return th
 
-    def set_noise(self, var):
-        for m in self.modules():
-            if isinstance(m, SLinear) or isinstance(m, SConv2d):
-                m.set_noise(var)
+    def set_noise(self, var, N=8, m=2):
+        for mo in self.modules():
+            if isinstance(mo, SLinear) or isinstance(mo, SConv2d):
+                # m.set_noise(var)
+                mo.set_noise(var, N, m)
     
     def clear_noise(self):
         for m in self.modules():
