@@ -18,7 +18,7 @@ class SModule(nn.Module):
     
     def set_noise(self, var, N, m):
         # N: number of bits per weight, m: number of bits per device
-        noise = torch.zeros_like(self.noise)
+        noise = torch.zeros_like(self.noise).to(self.op.weight.device)
         scale = self.op.weight.abs().max()
         for i in range(1, N//m + 1):
             noise += torch.normal(mean=0., std=var, size=self.noise.size()) * (pow(2, - i*m))
