@@ -199,7 +199,6 @@ if __name__ == "__main__":
     state_dict = torch.load(f"saved_B_{header}.pt")
     print(f"No mask no noise: {CEval():.4f}")
     model.load_state_dict(state_dict)
-    model.clear_mask()
     loader = range(args.noise_epoch)
     for _ in loader:
         acc = NEval(args.noise_var)
