@@ -244,7 +244,7 @@ class SModel(nn.Module):
         # print(th)
         return th
 
-    def set_noise(self, var, N=8, m=2):
+    def set_noise(self, var, N=8, m=1):
         for mo in self.modules():
             if isinstance(mo, SLinear) or isinstance(mo, SConv2d):
                 # m.set_noise(var)
