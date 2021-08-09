@@ -12,6 +12,8 @@ class SModule(nn.Module):
         self.weightS = nn.Parameter(torch.ones(self.op.weight.size()).requires_grad_())
         self.noise = torch.zeros_like(self.op.weight)
         self.mask = torch.ones_like(self.op.weight)
+        self.original_w = None
+        self.original_b = None
 
     # def set_noise(self, var):
         # self.noise = torch.normal(mean=0., std=var, size=self.noise.size()).to(self.op.weight.device) 
@@ -281,6 +283,28 @@ class SModel(nn.Module):
                 new = FakeSModule(m.op)
                 self._modules[name] = new
         self.to(device)
+    
+    def normalize(self):
+        for mo in self.modules():
+            if isinstance(mo, SLinear) or isinstance(mo, SConv2d):
+                if mo.original_w is not None:
+                    mo.original_w = mo.op.weight.data
+                if (mo.original_b is not None) and (mo.op.bias is not None):
+                    mo.original_b = mo.op.bias.data
+                scale = mo.op.weight.data.abs().max().item()
+                mo.op.weight.data = mo.op.weight.data / scale
+                if mo.op.bias is not None:
+                    mo.op.bias.data = mo.op.bias.data / scale
+    
+    def de_normalize(self):
+        for mo in self.modules():
+            if isinstance(mo, SLinear) or isinstance(mo, SConv2d):
+                if mo.original_w is not None:
+                    raise Exception("no original weight")
+                else:
+                    mo.op.weight.data = mo.original_w
+                    if mo.original_b is not None:
+                        mo.op.bias.data = mo.original_b
     
     def back_real(self, device):
         for name, m in self.named_modules():
