@@ -103,7 +103,8 @@ class SLinear(SModule):
         self.create_helper()
         self.function = SLinearFunction.apply
 
-    def forward(self, x, xS):
+    def forward(self, xC):
+        x, xS = xC
         x, xS = self.function(x, xS, (self.op.weight + self.noise) * self.mask, self.weightS, self.op.bias)
         return x, xS
 
@@ -114,7 +115,8 @@ class SConv2d(SModule):
         self.create_helper()
         self.function = SConv2dFunction.apply
 
-    def forward(self, x, xS):
+    def forward(self, xC):
+        x, xS = xC
         x, xS = self.function(x, xS, (self.op.weight + self.noise) * self.mask, self.weightS, self.op.bias, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
         return x, xS
 
@@ -158,7 +160,8 @@ class SReLU(nn.Module):
         super().__init__()
         self.op = nn.ReLU()
     
-    def forward(self, x, xS):
+    def forward(self, xC):
+        x, xS = xC
         with torch.no_grad():
             mask = (x > 0).to(torch.float)
         return self.op(x), xS * mask
@@ -178,7 +181,8 @@ class SMaxpool2D(nn.Module):
         return shape, [BD, CD, indice.view(-1)]
 
     
-    def forward(self, x, xS):
+    def forward(self, xC):
+        x, xS = xC
         x, indices = self.op(x)
         shape, indices = self.parse_indice(indices)
         xS = xS.view(shape)[indices].view(x.shape)
@@ -191,7 +195,8 @@ class FakeSModule(nn.Module):
         if isinstance(self.op, nn.MaxPool2d):
             self.op.return_indices = False
     
-    def forward(self, x, xS):
+    def forward(self, xC):
+        x, xS = xC
         x = self.op(x)
         return x, None
 

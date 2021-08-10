@@ -53,12 +53,12 @@ class SMLP3(SModel):
     def forward(self, x):
         x = x.view(x.size(0), -1)
         xS = torch.zeros_like(x)
-        x, xS = self.fc1(x, xS)
-        x, xS = self.relu(x, xS)
-        x, xS = self.fc2(x, xS)
-        x, xS = self.relu(x, xS)
-        x, xS = self.fc3(x, xS)
-        return x, xS
+        x = self.fc1((x, xS))
+        x = self.relu(x)
+        x = self.fc2(x)
+        x = self.relu(x)
+        x = self.fc3(x)
+        return x
 
 class SMLP4(SModel):
     def __init__(self):
@@ -72,14 +72,14 @@ class SMLP4(SModel):
     def forward(self, x):
         x = x.view(x.size(0), -1)
         xS = torch.zeros_like(x)
-        x, xS = self.fc1(x, xS)
-        x, xS = self.relu(x, xS)
-        x, xS = self.fc2(x, xS)
-        x, xS = self.relu(x, xS)
-        x, xS = self.fc3(x, xS)
-        x, xS = self.relu(x, xS)
-        x, xS = self.fc4(x, xS)
-        return x, xS
+        x = self.fc1((x, xS))
+        x = self.relu(x)
+        x = self.fc2(x)
+        x = self.relu(x)
+        x = self.fc3(x)
+        x = self.relu(x)
+        x = self.fc4(x)
+        return x
 
 
 class SLeNet(SModel):
@@ -99,26 +99,27 @@ class SLeNet(SModel):
 
     def forward(self, x):
         xS = torch.zeros_like(x)
-        x, xS = self.conv1(x, xS)
-        x, xS = self.relu(x, xS)
-        x, xS = self.pool(x, xS)
+        x = self.conv1((x, xS))
+        x = self.relu(x)
+        x = self.pool(x)
         
-        x, xS = self.conv2(x, xS)
-        x, xS = self.relu(x, xS)
-        x, xS = self.pool(x, xS)
+        x = self.conv2(x)
+        x = self.relu(x)
+        x = self.pool(x)
         
+        x, xS = x
         x = x.view(-1, self.num_flat_features(x))
         if xS is not None:
             xS = xS.view(-1, self.num_flat_features(xS))
         
-        x, xS = self.fc1(x, xS)
-        x, xS = self.relu(x, xS)
+        x = self.fc1((x, xS))
+        x = self.relu(x)
         
-        x, xS = self.fc2(x, xS)
-        x, xS = self.relu(x, xS)
+        x = self.fc2(x)
+        x = self.relu(x)
         
-        x, xS = self.fc3(x, xS)
-        return x, xS
+        x = self.fc3(x)
+        return x
 
     def num_flat_features(self, x):
         size = x.size()[1:]  # all dimensions except the batch dimension
@@ -150,34 +151,35 @@ class CIFAR(SModel):
 
     def forward(self, x):
         xS = torch.zeros_like(x)
-        x, xS = self.conv1(x, xS)
-        x, xS = self.relu(x, xS)
-        x, xS = self.conv2(x, xS)
-        x, xS = self.relu(x, xS)
-        x, xS = self.pool1(x, xS)
+        x = self.conv1((x, xS))
+        x = self.relu(x)
+        x = self.conv2(x)
+        x = self.relu(x)
+        x = self.pool1(x)
 
-        x, xS = self.conv3(x, xS)
-        x, xS = self.relu(x, xS)
-        x, xS = self.conv4(x, xS)
-        x, xS = self.relu(x, xS)
-        x, xS = self.pool2(x, xS)
+        x = self.conv3(x)
+        x = self.relu(x)
+        x = self.conv4(x)
+        x = self.relu(x)
+        x = self.pool2(x)
 
-        x, xS = self.conv5(x, xS)
-        x, xS = self.relu(x, xS)
-        x, xS = self.conv6(x, xS)
-        x, xS = self.relu(x, xS)
-        x, xS = self.pool3(x, xS)
+        x = self.conv5(x)
+        x = self.relu(x)
+        x = self.conv6(x)
+        x = self.relu(x)
+        x = self.pool3(x)
         
+        x, xS = x
         x = x.view(-1, self.num_flat_features(x))
         if xS is not None:
             xS = xS.view(-1, self.num_flat_features(xS))
         
-        x, xS = self.fc1(x, xS)
-        x, xS = self.relu(x, xS)
-        x, xS = self.fc2(x, xS)
-        x, xS = self.relu(x, xS)
-        x, xS = self.fc3(x, xS)
-        return x, xS
+        x = self.fc1((x, xS))
+        x = self.relu(x)
+        x = self.fc2(x)
+        x = self.relu(x)
+        x = self.fc3(x)
+        return x
 
     def num_flat_features(self, x):
         size = x.size()[1:]  # all dimensions except the batch dimension
