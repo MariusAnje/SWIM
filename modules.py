@@ -287,9 +287,9 @@ class SModel(nn.Module):
     def normalize(self):
         for mo in self.modules():
             if isinstance(mo, SLinear) or isinstance(mo, SConv2d):
-                if mo.original_w is not None:
+                if mo.original_w is None:
                     mo.original_w = mo.op.weight.data
-                if (mo.original_b is not None) and (mo.op.bias is not None):
+                if (mo.original_b is None) and (mo.op.bias is not None):
                     mo.original_b = mo.op.bias.data
                 scale = mo.op.weight.data.abs().max().item()
                 mo.op.weight.data = mo.op.weight.data / scale
@@ -299,7 +299,7 @@ class SModel(nn.Module):
     def de_normalize(self):
         for mo in self.modules():
             if isinstance(mo, SLinear) or isinstance(mo, SConv2d):
-                if mo.original_w is not None:
+                if mo.original_w is None:
                     raise Exception("no original weight")
                 else:
                     mo.op.weight.data = mo.original_w

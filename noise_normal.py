@@ -219,21 +219,6 @@ if __name__ == "__main__":
         print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
         model.back_real(device)
         model.push_S_device()
-        no_mask_acc_list = []
-        state_dict = torch.load(os.path.join(parent_path, f"saved_B_{header}.pt"), map_location=device)
-        model.load_state_dict(state_dict)
-        model.to(device)
-        model.push_S_device()
-        print(f"No mask no noise: {CEval():.4f}")
-        model.normalize()
-        print(f"No mask no noise: {CEval():.4f}")
-        model.clear_mask()
-        loader = tqdm(range(args.noise_epoch))
-        for _ in loader:
-            acc = NEval(args.noise_var)
-            no_mask_acc_list.append(acc)
-        print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
-        exit()
 
     
     state_dict = torch.load(os.path.join(parent_path, f"saved_B_{header}.pt"), map_location=device)
@@ -244,6 +229,7 @@ if __name__ == "__main__":
     optimizer = optim.Adam(model.parameters(), lr=0.01)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
     model.clear_noise()
+    model.normalize()
     GetSecond()
     print(f"S grad before masking: {model.fetch_S_grad().item():E}")
     
@@ -251,6 +237,7 @@ if __name__ == "__main__":
         mask_acc_list = []
         th = model.calc_sail_th(args.mask_p, args.method, args.alpha)
         model.set_mask_sail(th, "th", args.method, args.alpha)
+        model.de_normalize()
         print(f"with mask no noise: {CEval():.4f}")
         # GetSecond()
         print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
@@ -263,7 +250,7 @@ if __name__ == "__main__":
         #     mask_acc_list.append(acc)
         # print(f"With mask noise average acc: {np.mean(mask_acc_list):.4f}, std: {np.std(mask_acc_list):.4f}")
         
-        optimizer = optim.SGD(model.parameters(), lr=1e-3)
+        optimizer = optim.SGD(model.parameters(), lr=1e-4)
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
         NTrain(args.fine_epoch, header_timer, args.noise_var, args.verbose)
 
