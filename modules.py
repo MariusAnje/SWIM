@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch import functional
 from torch._C import device
-from Functions import SLinearFunction, SConv2dFunction, SMSEFunction, SCrossEntropyLossFunction    
+from Functions import SLinearFunction, SConv2dFunction, SMSEFunction, SCrossEntropyLossFunction, SBatchNorm2dFunction
 
 class SModule(nn.Module):
     def __init__(self):
@@ -156,9 +156,9 @@ class NConv2d(NModule):
         return x
 
 class SReLU(nn.Module):
-    def __init__(self):
+    def __init__(self, inplace=False):
         super().__init__()
-        self.op = nn.ReLU()
+        self.op = nn.ReLU(inplace)
     
     def forward(self, xC):
         x, xS = xC
@@ -186,6 +186,26 @@ class SMaxpool2D(nn.Module):
         x, indices = self.op(x)
         shape, indices = self.parse_indice(indices)
         xS = xS.view(shape)[indices].view(x.shape)
+        return x, xS
+
+class SAdaptiveAvgPool2d(nn.Module):
+    def __init__(self, output_size):
+        super().__init__()
+        self.op = nn.AdaptiveAvgPool2d(output_size)
+
+    def forward(self, xC):
+        x, xS = xC
+        return self.op(x), self.op(xS)
+
+class SBatchNorm2d(nn.Module):
+    def __init__(self, num_features, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True):
+        super().__init__()
+        self.op = nn.BatchNorm2d(num_features, eps, momentum, affine, track_running_stats)
+        self.function = SBatchNorm2dFunction.apply
+    
+    def forward(self, xC):
+        x, xS = xC
+        x, xS = self.function(x, xS, self.op.running_mean, self.op.running_var, self.op.weight, self.op.bias, self.op.training, self.op.momentum, self.op.eps)
         return x, xS
 
 class FakeSModule(nn.Module):
