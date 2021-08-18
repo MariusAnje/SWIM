@@ -117,6 +117,11 @@ class SConv2d(SModule):
 
     def forward(self, xC):
         x, xS = xC
+        # print(x.device)
+        # print(xS.device)
+        # print(self.mask.device)
+        # print(self.weightS.device)
+        # print(self.op.weight.device)
         x, xS = self.function(x, xS, (self.op.weight + self.noise) * self.mask, self.weightS, self.op.bias, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
         return x, xS
 
