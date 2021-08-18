@@ -122,10 +122,10 @@ class NModule(nn.Module):
     # def set_noise(self, var):
     #     self.noise = torch.normal(mean=0., std=var, size=self.noise.size()).to(self.op.weight.device) 
     def set_noise(self, var, N, m):
-        noise = torch.zeros_like(self.noise)
+        noise = torch.zeros_like(self.noise).to(self.op.weight.device)
         scale = self.op.weight.abs().max()
         for i in range(1, N//m + 1):
-            noise += torch.normal(mean=0., std=var, size=self.noise.size()) * (pow(2, - i*m))
+            noise += torch.normal(mean=0., std=var, size=self.noise.size()).to(self.op.weight.device) * (pow(2, - i*m))
         self.noise = noise.to(self.op.weight.device) * scale
     
     def clear_noise(self):

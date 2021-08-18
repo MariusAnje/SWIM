@@ -243,10 +243,11 @@ class FakeCIFAR(nn.Module):
             num_features *= s
         return num_features
     
-    def set_noise(self, var):
-        for m in self.modules():
-            if isinstance(m, NLinear) or isinstance(m, NConv2d):
-                m.set_noise(var)
+    def set_noise(self, var, N=8, m=1):
+        for mo in self.modules():
+            if isinstance(mo, NLinear) or isinstance(mo, NConv2d):
+                # m.set_noise(var)
+                mo.set_noise(var, N, m)
     
     def clear_noise(self):
         for m in self.modules():

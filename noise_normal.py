@@ -201,7 +201,7 @@ if __name__ == "__main__":
 
         no_mask_acc_list = []
         state_dict = torch.load(f"saved_B_{header}.pt")
-        print(f"No mask no noise: {CEval():.4f}")
+        # print(f"No mask no noise: {CEval():.4f}")
         model.load_state_dict(state_dict)
         model.clear_mask()
         loader = range(args.noise_epoch)
@@ -211,7 +211,7 @@ if __name__ == "__main__":
         print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
         torch.save(no_mask_acc_list, f"no_mask_list_{header}_{args.noise_var}.pt")
 
-        exit()
+        # exit()
     else:
         parent_path = args.model_path
         header = args.header
