@@ -64,11 +64,11 @@ class BasicBlock(SModel):
 
         if self.downsample is not None:
             identity = self.downsample(x)
-        
+
         out, outS = out
         identity, identityS = identity
-        out += identity
-        outS += identityS
+        out += identity * self.conv1.scale * self.conv2.scale
+        outS += identityS * self.conv1.scale * self.conv2.scale
         out = self.relu((out, outS))
         return out
 
@@ -125,8 +125,11 @@ class Bottleneck(SModel):
         if self.downsample is not None:
             identity = self.downsample(x)
 
-        out += identity
-        out = self.relu(out)
+        out, outS = out
+        identity, identityS = identity
+        out += identity * self.get_scale()
+        outS += identityS * self.get_scale()
+        out = self.relu((out, outS))
 
         return out
 
