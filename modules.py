@@ -96,6 +96,17 @@ class SModule(nn.Module):
 
     def do_second(self):
         self.op.weight.grad.data = self.op.weight.grad.data / (self.weightS.grad.data + 1e-10)
+    
+    def normalize(self):
+        if self.original_w is None:
+            self.original_w = self.op.weight.data
+        if (self.original_b is None) and (self.op.bias is not None):
+            self.original_b = self.op.bias.data
+        scale = self.op.weight.data.abs().max().item()
+        self.scale = scale
+        self.op.weight.data = self.op.weight.data / scale
+        # if self.op.bias is not None:
+        #     self.op.bias.data = self.op.bias.data / scale
 
 class SLinear(SModule):
     def __init__(self, in_features, out_features, bias=True):
@@ -106,7 +117,10 @@ class SLinear(SModule):
 
     def forward(self, xC):
         x, xS = xC
-        x, xS = self.function(x, xS, (self.op.weight + self.noise) * self.mask, self.weightS, self.op.bias)
+        x, xS = self.function(x, xS, (self.op.weight + self.noise) * self.mask, self.weightS)
+        x = self.scale * x
+        if self.op.bias is not None:
+            x += self.op.bias
         return x, xS
 
 class SConv2d(SModule):
@@ -123,7 +137,10 @@ class SConv2d(SModule):
         # print(self.mask.device)
         # print(self.weightS.device)
         # print(self.op.weight.device)
-        x, xS = self.function(x, xS, (self.op.weight + self.noise) * self.mask, self.weightS, self.op.bias, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
+        x, xS = self.function(x, xS, (self.op.weight + self.noise) * self.mask, self.weightS, None, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
+        x = self.scale * x
+        if self.op.bias is not None:
+            x += self.op.bias.reshape(1,-1,1,1).expand_as(x)
         return x, xS
 
 class NModule(nn.Module):
@@ -318,16 +335,8 @@ class SModel(nn.Module):
     def normalize(self):
         for mo in self.modules():
             if isinstance(mo, SLinear) or isinstance(mo, SConv2d):
-                if mo.original_w is None:
-                    mo.original_w = mo.op.weight.data
-                if (mo.original_b is None) and (mo.op.bias is not None):
-                    mo.original_b = mo.op.bias.data
-                scale = mo.op.weight.data.abs().max().item()
-                mo.scale = scale
-                mo.op.weight.data = mo.op.weight.data / scale
-                if mo.op.bias is not None:
-                    mo.op.bias.data = mo.op.bias.data / scale
-    
+                mo.normalize()
+
     def get_scale(self):
         scale = 1.0
         for m in self.modules():

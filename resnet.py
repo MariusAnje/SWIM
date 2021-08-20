@@ -67,8 +67,8 @@ class BasicBlock(SModel):
 
         out, outS = out
         identity, identityS = identity
-        out += identity * self.conv1.scale * self.conv2.scale
-        outS += identityS * self.conv1.scale * self.conv2.scale
+        out += identity
+        outS += identityS
         out = self.relu((out, outS))
         return out
 
@@ -127,8 +127,8 @@ class Bottleneck(SModel):
 
         out, outS = out
         identity, identityS = identity
-        out += identity * self.get_scale()
-        outS += identityS * self.get_scale()
+        out += identity
+        outS += identityS
         out = self.relu((out, outS))
 
         return out
