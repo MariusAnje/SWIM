@@ -243,6 +243,21 @@ class FakeSModule(nn.Module):
         x = self.op(x)
         return x, None
 
+class NModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def set_noise(self, var, N=8, m=1):
+        for mo in self.modules():
+            if isinstance(mo, NModule):
+                # m.set_noise(var)
+                mo.set_noise(var, N, m)
+    
+    def clear_noise(self):
+        for m in self.modules():
+            if isinstance(m, NModule):
+                m.clear_noise()
+
 class SModel(nn.Module):
     def __init__(self):
         super().__init__()

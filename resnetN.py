@@ -3,7 +3,7 @@ from torch import Tensor
 import torch.nn as nn
 from typing import Type, Any, Callable, Union, List, Optional
 from modules import NConv2d, NLinear
-from modules import SModel, NModule
+from modules import NModel, NModule
 
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
@@ -22,7 +22,7 @@ def conv1x1(in_planes: int, out_planes: int, stride: int = 1) -> NConv2d:
     return NConv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
 
 
-class BasicBlock(SModel):
+class BasicBlock(NModel):
     expansion: int = 1
 
     def __init__(
@@ -72,7 +72,7 @@ class BasicBlock(SModel):
         return out
 
 
-class Bottleneck(SModel):
+class Bottleneck(NModel):
     # Bottleneck in torchvision places the stride for downsampling at 3x3 convolution(self.conv2)
     # while original implementation places the stride at the first 1x1 convolution(self.conv1)
     # according to "Deep residual learning for image recognition"https://arxiv.org/abs/1512.03385.
@@ -131,7 +131,7 @@ class Bottleneck(SModel):
         return out
 
 
-class ResNet(SModel):
+class ResNet(NModel):
 
     def __init__(
         self,
