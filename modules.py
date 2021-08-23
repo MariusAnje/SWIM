@@ -296,7 +296,7 @@ class SModel(nn.Module):
 
     def set_noise(self, var, N=8, m=1):
         for mo in self.modules():
-            if isinstance(mo, SLinear) or isinstance(mo, SConv2d):
+            if isinstance(mo, SLinear) or isinstance(mo, SConv2d) or isinstance(NModule):
                 # m.set_noise(var)
                 mo.set_noise(var, N, m)
     
