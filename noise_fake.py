@@ -4,6 +4,7 @@ from torch import optim
 import torchvision.transforms as transforms
 import numpy as np
 from models import FakeCIFAR, SCrossEntropyLoss, SMLP3, SMLP4, SLeNet, CIFAR, FakeSCrossEntropyLoss
+import resnetN
 from modules import SModule
 from tqdm import tqdm
 import time
@@ -62,7 +63,7 @@ def NTrain(epochs, header, var, verbose=False):
     best_acc = 0.0
     for i in range(epochs):
         running_loss = 0.
-        for images, labels in trainloader:
+        for images, labels in tqdm(trainloader):
             model.clear_noise()
             model.set_noise(var)
             optimizer.zero_grad()
@@ -104,34 +105,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--train_epoch', action='store', type=int, default=20,
             help='# of epochs of training')
-    parser.add_argument('--fine_epoch', action='store', type=int, default=20,
-            help='# of epochs of finetuning')
     parser.add_argument('--noise_epoch', action='store', type=int, default=100,
             help='# of epochs of noise validations')
     parser.add_argument('--noise_var', action='store', type=float, default=0.1,
             help='noise variation')
-    parser.add_argument('--mask_p', action='store', type=float, default=0.01,
-            help='portion of the mask')
     parser.add_argument('--device', action='store', default="cuda:0",
             help='device used')
     parser.add_argument('--verbose', action='store', type=str2bool, default=False,
             help='see training process')
-    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR"],
+    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR", "Res18"],
             help='model to use')
-    parser.add_argument('--method', action='store', default="second", choices=["second", "magnitude", "saliency", "r_saliency", "subtract"],
-            help='method used to calculate saliency')
-    parser.add_argument('--alpha', action='store', type=float, default=1.0,
-            help='weight used in saliency - substract')
-    parser.add_argument('--header', action='store',type=int, default=1,
-            help='use which saved state dict')
-    parser.add_argument('--pretrained', action='store',type=str2bool, default=True,
-            help='if to use pretrained model')
-    parser.add_argument('--use_mask', action='store',type=str2bool, default=True,
-            help='if to do the masking experiment')
-    parser.add_argument('--model_path', action='store', default="./pretrained",
-            help='where you put the pretrained model')
-    parser.add_argument('--save_file', action='store',type=str2bool, default=True,
-            help='if to save the files')
     args = parser.parse_args()
 
     print(args)
@@ -143,7 +126,7 @@ if __name__ == "__main__":
 
     BS = 128
 
-    if args.model != "CIFAR":
+    if not (args.model == "CIFAR" or args.model == "Res18"):
         trainset = torchvision.datasets.MNIST(root='~/Private/data', train=True,
                                                 download=False, transform=transforms.ToTensor())
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS,
@@ -179,6 +162,8 @@ if __name__ == "__main__":
         model = SLeNet()
     elif args.model == "CIFAR":
         model = FakeCIFAR()
+    elif args.model == "Res18":
+        model = resnetN.resnet18(num_classes = 10)
 
     model.to(device)
     model.clear_noise()
