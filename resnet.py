@@ -222,7 +222,8 @@ class ResNet(SModel):
 
     def _forward_impl(self, x: Tensor) -> Tensor:
         # See note [TorchScript super()]
-        x = self.conv1(x)
+        xS = torch.ones_like(x)
+        x = self.conv1((x, xS))
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)

@@ -4,6 +4,7 @@ from torch import optim
 import torchvision.transforms as transforms
 import numpy as np
 from models import SCrossEntropyLoss, SMLP3, SMLP4, SLeNet, CIFAR, FakeSCrossEntropyLoss
+import resnet
 from modules import SModule
 from tqdm import tqdm
 import time
@@ -116,7 +117,7 @@ if __name__ == "__main__":
             help='device used')
     parser.add_argument('--verbose', action='store', type=str2bool, default=False,
             help='see training process')
-    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR"],
+    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR", "Res18"],
             help='model to use')
     parser.add_argument('--method', action='store', default="second", choices=["second", "magnitude", "saliency", "r_saliency", "subtract"],
             help='method used to calculate saliency')
@@ -145,7 +146,7 @@ if __name__ == "__main__":
 
     BS = 128
 
-    if args.model != "CIFAR":
+    if not (args.model == "CIFAR" or args.model == "Res18"):
         trainset = torchvision.datasets.MNIST(root='~/Private/data', train=True,
                                                 download=False, transform=transforms.ToTensor())
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS,
@@ -181,6 +182,8 @@ if __name__ == "__main__":
         model = SLeNet()
     elif args.model == "CIFAR":
         model = CIFAR()
+    elif args.model == "Res18":
+        model = resnet.resnet18(num_classes = 10)
 
     model.to(device)
     model.push_S_device()
