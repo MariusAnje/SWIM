@@ -42,7 +42,9 @@ class SModule(nn.Module):
         if method == "r_saliency":
             if alpha is None:
                 alpha = 2
-            return self.weightS.grad.abs() * self.op.weight.abs().max() / (self.op.weight.data ** alpha + 1e-8).abs()
+            # MODIFICATION HERE DUDE
+            # return self.weightS.grad.abs() * self.weightS.grad.abs().max() / (self.op.weight.data ** alpha + 1e-8).abs()
+            return self.weightS.grad.abs() / ((self.op.weight.data * self.scale) ** alpha + 1e-8).abs()
         if method == "subtract":
             return self.weightS.grad.data.abs() - alpha * self.weightS.grad.data.abs() * (self.op.weight.data ** 2)
         else:
