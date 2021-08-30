@@ -50,11 +50,12 @@ class SModule(nn.Module):
     def set_mask(self, portion, mode):
         if mode == "portion":
             th = self.weightS.grad.abs().view(-1).quantile(1-portion)
-            self.mask = (self.weightS.grad.data.abs() <= th).to(torch.float)
+            mask = (self.weightS.grad.data.abs() <= th).to(torch.float)
         elif mode == "th":
-            self.mask = (self.weightS.grad.data.abs() <= portion).to(torch.float)
+            mask = (self.weightS.grad.data.abs() <= portion).to(torch.float)
         else:
             raise NotImplementedError(f"Mode: {mode} not supported, only support mode portion & th, ")
+        self.mask = self.mask * mask
     
     def set_mask_mag(self, portion, mode):
         if mode == "portion":
