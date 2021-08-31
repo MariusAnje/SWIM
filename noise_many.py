@@ -240,6 +240,7 @@ if __name__ == "__main__":
         th = model.calc_sail_th(args.mask_p, args.method, args.alpha)
         model.set_mask_sail(th, "th", args.method, args.alpha)
         for i in range(10):
+            print(f"Total weights removed {RM_new/total:.4f}")
             model.de_normalize()
             print(f"with mask no noise: {CEval():.4f}")
             print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
@@ -263,7 +264,6 @@ if __name__ == "__main__":
             GetSecond()
             model.set_mask_sail(th, "th", args.method, args.alpha)
             total, RM_new = model.get_mask_info()
-            print(f"Total weights removed {RM_new/total:.4f}")
             if (RM_new - RM_old) <= (total * 1e-6):
                 flag = True
             RM_old = RM_new

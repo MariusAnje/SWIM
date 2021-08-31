@@ -75,11 +75,12 @@ class SModule(nn.Module):
         saliency = self.mask_indicator(method, alpha)
         if mode == "portion":
             th = saliency.view(-1).quantile(1-portion)
-            self.mask = (saliency <= th).to(torch.float)
+            mask = (saliency <= th).to(torch.float)
         elif mode == "th":
-            self.mask = (saliency <= portion).to(torch.float)
+            mask = (saliency <= portion).to(torch.float)
         else:
             raise NotImplementedError(f"Mode: {mode} not supported, only support mode portion & th, ")
+        self.mask = self.mask * mask
     
     def clear_mask(self):
         self.mask = torch.ones_like(self.op.weight)
