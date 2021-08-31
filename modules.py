@@ -46,6 +46,11 @@ class SModule(nn.Module):
             return self.weightS.grad.data.abs() - alpha * self.weightS.grad.data.abs() * (self.op.weight.data ** 2)
         else:
             raise NotImplementedError(f"method {method} not supported")
+    
+    def get_mask_info(self):
+        total = (self.mask != 10).sum()
+        RM = (self.mask == 0).sum()
+        return total, RM
 
     def set_mask(self, portion, mode):
         if mode == "portion":
@@ -258,6 +263,16 @@ class SModel(nn.Module):
             if isinstance(m, SLinear) or isinstance(m, SConv2d):
                 m.clear_noise()
     
+    def get_mask_info(self):
+        total = 0
+        RM = 0
+        for m in self.modules():
+            if isinstance(m, SLinear) or isinstance(m, SConv2d):
+                t, r = m.get_mask_info()
+                total += t
+                RM += r
+        return total, RM
+
     def set_mask(self, th, mode):
         for m in self.modules():
             if isinstance(m, SLinear) or isinstance(m, SConv2d):

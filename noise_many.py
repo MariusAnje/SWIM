@@ -232,6 +232,8 @@ if __name__ == "__main__":
     model.normalize()
     GetSecond()
     print(f"S grad before masking: {model.fetch_S_grad().item():E}")
+    total, RM_old = model.get_mask_info()
+    flag = False
     
     if args.use_mask:
         mask_acc_list = []
@@ -245,6 +247,8 @@ if __name__ == "__main__":
                 GetSecond()
                 print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
             
+            if flag:
+                break
             optimizer = optim.SGD(model.parameters(), lr=1e-4)
             scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
             NTrain(args.fine_epoch, header_timer, args.noise_var, args.verbose)
@@ -258,6 +262,11 @@ if __name__ == "__main__":
             model.normalize()
             GetSecond()
             model.set_mask_sail(th, "th", args.method, args.alpha)
+            total, RM_new = model.get_mask_info()
+            print(f"Total weights removed {RM_new/total:.4f}")
+            if (RM_new - RM_old) <= (total * 1e-6):
+                flag = True
+            RM_old = RM_new
             
         loader = range(args.noise_epoch)
         for _ in loader:
