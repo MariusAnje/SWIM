@@ -232,15 +232,15 @@ if __name__ == "__main__":
     model.normalize()
     GetSecond()
     print(f"S grad before masking: {model.fetch_S_grad().item():E}")
-    total, RM_old = model.get_mask_info()
-    flag = False
     
     if args.use_mask:
         mask_acc_list = []
         th = model.calc_sail_th(args.mask_p, args.method, args.alpha)
         model.set_mask_sail(th, "th", args.method, args.alpha)
+        total, RM_old = model.get_mask_info()
+        flag = False
         for i in range(10):
-            print(f"Total weights removed {RM_new/total:.4f}")
+            print(f"Total weights removed {RM_old/total:.6f}")
             model.de_normalize()
             print(f"with mask no noise: {CEval():.4f}")
             print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
@@ -268,13 +268,13 @@ if __name__ == "__main__":
                 flag = True
             RM_old = RM_new
             
-        loader = range(args.noise_epoch)
-        for _ in loader:
-            acc = NEval(args.noise_var)
-            fine_mask_acc_list.append(acc)
-        print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
-        model.clear_noise()
-        if args.calc_S:
-            GetSecond()
-            print(f"S grad after finetune: {model.fetch_S_grad().item():E}")
+            loader = range(args.noise_epoch)
+            for _ in loader:
+                acc = NEval(args.noise_var)
+                fine_mask_acc_list.append(acc)
+            print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
+            model.clear_noise()
+            if args.calc_S:
+                GetSecond()
+                print(f"S grad after finetune: {model.fetch_S_grad().item():E}")
         os.system(f"rm tmp_best_{header_timer}.pt")
