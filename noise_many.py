@@ -83,6 +83,7 @@ def NTrain(epochs, header, var, verbose=False):
 
 def GetSecond():
     model.clear_noise()
+    model.clear_S_grad()
     optimizer.zero_grad()
     for images, labels in trainloader:
         images, labels = images.to(device), labels.to(device)
@@ -234,12 +235,19 @@ if __name__ == "__main__":
     print(f"S grad before masking: {model.fetch_S_grad().item():E}")
     
     if args.use_mask:
-        mask_acc_list = []
         th = model.calc_sail_th(args.mask_p, args.method, args.alpha)
-        model.set_mask_sail(th, "th", args.method, args.alpha)
-        total, RM_old = model.get_mask_info()
-        flag = False
+        RM_old = 0
         for i in range(10):
+            model.clear_noise()
+            model.clear_S_grad()
+            model.normalize()
+            GetSecond()
+            model.set_mask_sail(th, "th", args.method, args.alpha)
+            total, RM_new = model.get_mask_info()
+            if (RM_new - RM_old) <= (total * 1e-6):
+                break
+            RM_old = RM_new
+            print(total)
             print(f"Total weights removed {RM_old/total:.6f}")
             model.de_normalize()
             print(f"with mask no noise: {CEval():.4f}")
@@ -248,25 +256,14 @@ if __name__ == "__main__":
                 GetSecond()
                 print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
             
-            if flag:
-                break
             optimizer = optim.SGD(model.parameters(), lr=1e-4)
             scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
             NTrain(args.fine_epoch, header_timer, args.noise_var, args.verbose)
 
             if args.save_file:
-                torch.save(model.state_dict(), f"saved_A_{header}_{header_timer}.pt")
+                torch.save(model.state_dict(), f"saved_A_{header}_{header_timer}_{i}.pt")
             fine_mask_acc_list = []
             print(f"Finetune no noise: {CEval():.4f}")
-            model.clear_noise()
-            model.clear_S_grad()
-            model.normalize()
-            GetSecond()
-            model.set_mask_sail(th, "th", args.method, args.alpha)
-            total, RM_new = model.get_mask_info()
-            if (RM_new - RM_old) <= (total * 1e-6):
-                flag = True
-            RM_old = RM_new
             
             loader = range(args.noise_epoch)
             for _ in loader:
@@ -277,4 +274,6 @@ if __name__ == "__main__":
             if args.calc_S:
                 GetSecond()
                 print(f"S grad after finetune: {model.fetch_S_grad().item():E}")
+            
+            
         os.system(f"rm tmp_best_{header_timer}.pt")
