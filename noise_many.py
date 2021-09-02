@@ -247,7 +247,6 @@ if __name__ == "__main__":
             if (RM_new - RM_old) <= (total * 1e-6):
                 break
             RM_old = RM_new
-            print(total)
             print(f"Total weights removed {RM_old/total:.6f}")
             model.de_normalize()
             print(f"with mask no noise: {CEval():.4f}")
