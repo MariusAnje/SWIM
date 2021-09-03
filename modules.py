@@ -382,10 +382,10 @@ class SModel(nn.Module):
                 else:
                     mo.scale = 1.0
                     mo.op.weight.data = mo.original_w
-                    # mo.original_w = None
+                    mo.original_w = None
                     if mo.original_b is not None:
                         mo.op.bias.data = mo.original_b
-                        # mo.original_b = None
+                        mo.original_b = None
     
     def back_real(self, device):
         for name, m in self.named_modules():
