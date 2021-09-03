@@ -67,12 +67,22 @@ class SConv2dFunction(autograd.Function):
         conv_out = F.conv2d(input, weight, bias, stride, padding, dilation, groups)
         padding = padding[0]
         padded_input = F.pad(input,tuple(4*[padding]))
+        ctx.stride = stride
         ctx.save_for_backward(padded_input, weight, bias, torch.IntTensor([padding]).to(padded_input.device))
         return conv_out, torch.ones_like(conv_out)
     
     @staticmethod
     def backward(ctx, grad_output, grad_outputS):
         input, weight, bias, padding = ctx.saved_tensors
+        stride = ctx.stride
+        o_size = grad_output.shape
+        new_o = torch.zeros(o_size[0], o_size[1], o_size[2] * stride[0], o_size[3] * stride[1]).to(grad_output.device)
+        new_o[:,:,::stride[0],::stride[1]] = grad_output
+        new_oS = torch.zeros(o_size[0], o_size[1], o_size[2] * stride[0], o_size[3] * stride[1]).to(grad_outputS.device)
+        new_oS[:,:,::stride[0],::stride[1]] = grad_outputS
+        grad_output = new_o
+        grad_outputS = new_oS
+
         oc, ic, kw, kh = weight.shape
         col_image = F.unfold(input,(kw,kh)).transpose(1,2)
         bs, channels, ow, oh = grad_output.shape
@@ -99,6 +109,42 @@ class SConv2dFunction(autograd.Function):
         grad_iS = F.fold(grad_iS, (ow, oh), (1,1))
 
         return grad_i, grad_iS, grad_w, grad_wS, grad_b, None, None, None, None
+
+
+class SBatchNorm2dFunction(autograd.Function):
+    @staticmethod
+    # bias is an optional argument
+    def forward(ctx, input, inputS, running_mean, running_var, weight=None, bias=None, training=False, momentum=0.1, eps=1e-05):
+        function = torch.nn.functional.batch_norm
+        output = function(input, running_mean, running_var, weight, bias, training, momentum, eps)
+        ctx.save_for_backward(input, running_mean, running_var, weight, bias, torch.Tensor([eps]).to(weight.device))
+        return output, torch.ones_like(output)
+
+    @staticmethod
+    def backward(ctx, grad_output, grad_outputS):
+        
+        input, running_mean, running_var, weight, bias, eps = ctx.saved_tensors
+        running_mean = running_mean.view(1,-1,1,1)
+        running_var = running_var.view(1,-1,1,1)
+        weight = weight.view(1,-1,1,1)
+        skr = torch.sqrt(running_var + eps)
+        if weight is not None:
+            grad_weight = ((input - running_mean) / skr).sum(dim=[0,2,3])
+        else:
+            weight = 1
+            grad_weight = None
+        if bias is not None:
+            grad_bias = grad_output.sum(axis=[0,2,3])
+        else:
+            bias = 0
+            grad_bias = None
+        grad_input = grad_output * weight / skr
+        grad_inputS = grad_outputS * (weight**2) / running_var + eps
+        
+
+        return grad_input, grad_inputS, None, None, grad_weight, grad_bias, None, None, None
+
+
 
 class SMSEFunction(autograd.Function):
     @staticmethod

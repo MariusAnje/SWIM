@@ -236,6 +236,7 @@ if __name__ == "__main__":
     
     if args.use_mask:
         th = model.calc_sail_th(args.mask_p, args.method, args.alpha)
+        model.de_normalize()
         RM_old = 0
         for i in range(10):
             model.clear_noise()
