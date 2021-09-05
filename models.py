@@ -53,7 +53,9 @@ class SMLP3(SModel):
     def forward(self, x):
         x = x.view(x.size(0), -1)
         xS = torch.zeros_like(x)
-        x = self.fc1((x, xS))
+        if not self.first_only:
+            x = (x, xS)
+        x = self.fc1(x)
         x = self.relu(x)
         x = self.fc2(x)
         x = self.relu(x)
@@ -72,7 +74,9 @@ class SMLP4(SModel):
     def forward(self, x):
         x = x.view(x.size(0), -1)
         xS = torch.zeros_like(x)
-        x = self.fc1((x, xS))
+        if not self.first_only:
+            x = (x, xS)
+        x = self.fc1(x)
         x = self.relu(x)
         x = self.fc2(x)
         x = self.relu(x)
@@ -99,7 +103,9 @@ class SLeNet(SModel):
 
     def forward(self, x):
         xS = torch.zeros_like(x)
-        x = self.conv1((x, xS))
+        if not self.first_only:
+            x = (x, xS)
+        x = self.conv1(x)
         x = self.relu(x)
         x = self.pool(x)
         
@@ -107,12 +113,9 @@ class SLeNet(SModel):
         x = self.relu(x)
         x = self.pool(x)
         
-        x, xS = x
-        x = x.view(-1, self.num_flat_features(x))
-        if xS is not None:
-            xS = xS.view(-1, self.num_flat_features(xS))
+        x = self.unpack_flattern(x)
         
-        x = self.fc1((x, xS))
+        x = self.fc1(x)
         x = self.relu(x)
         
         x = self.fc2(x)
@@ -151,7 +154,9 @@ class CIFAR(SModel):
 
     def forward(self, x):
         xS = torch.zeros_like(x)
-        x = self.conv1((x, xS))
+        if not self.first_only:
+            x = (x, xS)
+        x = self.conv1(x)
         x = self.relu(x)
         x = self.conv2(x)
         x = self.relu(x)

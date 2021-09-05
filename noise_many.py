@@ -19,7 +19,9 @@ def CEval():
             images, labels = images.to(device), labels.to(device)
             # images = images.view(-1, 784)
             outputs = model(images)
-            predictions = outputs[0].argmax(dim=1)
+            if len(outputs) == 2:
+                outputs = outputs[0]
+            predictions = outputs.argmax(dim=1)
             correction = predictions == labels
             correct += correction.sum()
             total += len(correction)
@@ -35,7 +37,9 @@ def NEval(var):
             images, labels = images.to(device), labels.to(device)
             # images = images.view(-1, 784)
             outputs = model(images)
-            predictions = outputs[0].argmax(dim=1)
+            if len(outputs) == 2:
+                outputs = outputs[0]
+            predictions = outputs.argmax(dim=1)
             correction = predictions == labels
             correct += correction.sum()
             total += len(correction)
@@ -52,7 +56,9 @@ def NEachEval(var):
             images, labels = images.to(device), labels.to(device)
             # images = images.view(-1, 784)
             outputs = model(images)
-            predictions = outputs[0].argmax(dim=1)
+            if len(outputs) == 2:
+                outputs = outputs[0]
+            predictions = outputs.argmax(dim=1)
             correction = predictions == labels
             correct += correction.sum()
             total += len(correction)
@@ -68,8 +74,10 @@ def NTrain(epochs, header, var, verbose=False):
             optimizer.zero_grad()
             images, labels = images.to(device), labels.to(device)
             # images = images.view(-1, 784)
-            outputs, outputsS = model(images)
-            loss = criteria(outputs, outputsS,labels)
+            # outputs, outputsS = model(images)
+            # loss = criteria(outputs, outputsS,labels)
+            outputs = model(images)
+            loss = criteriaF(outputs, labels)
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
@@ -227,6 +235,7 @@ if __name__ == "__main__":
     model.back_real(device)
     model.push_S_device()
     criteria = SCrossEntropyLoss()
+    criteriaF = torch.nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.01)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
     model.clear_noise()
@@ -251,14 +260,16 @@ if __name__ == "__main__":
             print(f"Total weights removed {RM_old/total:.6f}")
             model.de_normalize()
             print(f"with mask no noise: {CEval():.4f}")
-            print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
+            print(f"S grad after masking: {model.fetch_S_grad().item():E}")
             if args.calc_S:
                 GetSecond()
-                print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
+                print(f"S grad after masking: {model.fetch_S_grad().item():E}")
             
+            model.to_first_only()
             optimizer = optim.SGD(model.parameters(), lr=1e-4)
             scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
             NTrain(args.fine_epoch, header_timer, args.noise_var, args.verbose)
+            model.from_first_back_second()
 
             if args.save_file:
                 torch.save(model.state_dict(), f"saved_A_{header}_{header_timer}_{i}.pt")

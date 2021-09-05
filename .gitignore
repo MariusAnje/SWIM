@@ -148,3 +148,4 @@ test_mask.ipynb
 .vscode/
 load_fake.ipynb
 save_model.ipynb
+test_normal.ipynb
