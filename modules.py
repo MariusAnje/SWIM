@@ -122,6 +122,7 @@ class SLinear(SModule):
         x, xS = xC
         x, xS = self.function(x, xS, (self.op.weight + self.noise) * self.mask, self.weightS)
         x = self.scale * x
+        xS = self.scale * xS
         if self.op.bias is not None:
             x += self.op.bias
         return x, xS
@@ -142,6 +143,7 @@ class SConv2d(SModule):
         # print(self.op.weight.device)
         x, xS = self.function(x, xS, (self.op.weight + self.noise) * self.mask, self.weightS, None, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
         x = self.scale * x
+        xS = self.scale * xS
         if self.op.bias is not None:
             x += self.op.bias.reshape(1,-1,1,1).expand_as(x)
         return x, xS
