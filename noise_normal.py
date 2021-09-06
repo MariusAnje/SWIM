@@ -240,7 +240,7 @@ if __name__ == "__main__":
         mask_acc_list = []
         th = model.calc_sail_th(args.mask_p, args.method, args.alpha)
         model.set_mask_sail(th, "th", args.method, args.alpha)
-        model.de_normalize()
+        # model.de_normalize()
         print(f"with mask no noise: {CEval():.4f}")
         # GetSecond()
         print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
