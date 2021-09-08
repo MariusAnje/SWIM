@@ -90,6 +90,7 @@ class SModule(nn.Module):
     def push_S_device(self):
         self.weightS = self.weightS.to(self.op.weight.device)
         self.mask = self.mask.to(self.op.weight.device)
+        self.noise = self.noise.to(self.op.weight.device)
 
     def clear_S_grad(self):
         with torch.no_grad():

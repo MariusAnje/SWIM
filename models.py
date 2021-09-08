@@ -174,12 +174,9 @@ class CIFAR(SModel):
         x = self.relu(x)
         x = self.pool3(x)
         
-        x, xS = x
-        x = x.view(-1, self.num_flat_features(x))
-        if xS is not None:
-            xS = xS.view(-1, self.num_flat_features(xS))
-        
-        x = self.fc1((x, xS))
+        x = self.unpack_flattern(x)
+ 
+        x = self.fc1(x)
         x = self.relu(x)
         x = self.fc2(x)
         x = self.relu(x)
