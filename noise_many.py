@@ -178,6 +178,7 @@ if __name__ == "__main__":
                 ])
         trainset = torchvision.datasets.CIFAR10(root='~/Private/data', train=True, download=False, transform=train_transform)
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS, shuffle=True, num_workers=4)
+        # trainloader = tqdm(trainloader)
         testset = torchvision.datasets.CIFAR10(root='~/Private/data', train=False, download=False, transform=transform)
         testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=4)
 
@@ -254,10 +255,10 @@ if __name__ == "__main__":
             GetSecond()
             model.set_mask_sail(th, "th", args.method, args.alpha)
             total, RM_new = model.get_mask_info()
+            print(f"Total weights removed {RM_new/total:.6f}")
             if (RM_new - RM_old) <= (total * 1e-6):
                 break
             RM_old = RM_new
-            print(f"Total weights removed {RM_old/total:.6f}")
             model.de_normalize()
             print(f"with mask no noise: {CEval():.4f}")
             print(f"S grad after masking: {model.fetch_S_grad().item():E}")
@@ -266,10 +267,14 @@ if __name__ == "__main__":
                 print(f"S grad after masking: {model.fetch_S_grad().item():E}")
             
             model.to_first_only()
+            model.to(device)
+            model.push_S_device()
             optimizer = optim.SGD(model.parameters(), lr=1e-4)
             scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
             NTrain(args.fine_epoch, header_timer, args.noise_var, args.verbose)
             model.from_first_back_second()
+            model.to(device)
+            model.push_S_device()
 
             if args.save_file:
                 torch.save(model.state_dict(), f"saved_A_{header}_{header_timer}_{i}.pt")

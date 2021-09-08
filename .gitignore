@@ -149,3 +149,7 @@ test_mask.ipynb
 load_fake.ipynb
 save_model.ipynb
 test_normal.ipynb
+test_res.py
+second_many.py
+many_test.py
+.__afs*
