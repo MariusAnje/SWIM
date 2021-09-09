@@ -43,9 +43,9 @@ class SModule(nn.Module):
             if alpha is None:
                 alpha = 2
             # MODIFICATION HERE DUDE
-            # return self.weightS.grad.abs() * self.weightS.grad.abs().max() / (self.op.weight.data ** alpha + 1e-8).abs() # Original
+            return self.weightS.grad.abs() * self.weightS.grad.abs().max() / (self.op.weight.data ** alpha + 1e-8).abs() # Original
             # return self.weightS.grad.abs() / (self.op.weight.data ** alpha + 1e-8).abs()
-            return self.weightS.grad.abs() / ((self.op.weight.data * self.scale) ** alpha + 1e-8).abs()
+            # return self.weightS.grad.abs() / ((self.op.weight.data * self.scale) ** alpha + 1e-8).abs()
         if method == "subtract":
             return self.weightS.grad.data.abs() - alpha * self.weightS.grad.data.abs() * (self.op.weight.data ** 2)
         else:
@@ -120,9 +120,9 @@ class SLinear(SModule):
 
     def forward(self, xC):
         x, xS = xC
-        x, xS = self.function(x, xS, (self.op.weight + self.noise) * self.mask, self.weightS)
-        x = self.scale * x
-        xS = self.scale * xS
+        x, xS = self.function(x * self.scale, xS * self.scale, (self.op.weight + self.noise) * self.mask, self.weightS)
+        # x = self.scale * x
+        # xS = self.scale * xS
         if self.op.bias is not None:
             x += self.op.bias
         return x, xS
@@ -141,9 +141,9 @@ class SConv2d(SModule):
         # print(self.mask.device)
         # print(self.weightS.device)
         # print(self.op.weight.device)
-        x, xS = self.function(x, xS, (self.op.weight + self.noise) * self.mask, self.weightS, None, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
-        x = self.scale * x
-        xS = self.scale * xS
+        x, xS = self.function(x * self.scale, xS * self.scale, (self.op.weight + self.noise) * self.mask, self.weightS, None, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
+        # x = self.scale * x
+        # xS = self.scale * xS
         if self.op.bias is not None:
             x += self.op.bias.reshape(1,-1,1,1).expand_as(x)
         return x, xS
