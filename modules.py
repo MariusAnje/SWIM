@@ -45,7 +45,7 @@ class SModule(nn.Module):
             # MODIFICATION HERE DUDE
             return self.weightS.grad.abs() * self.weightS.grad.abs().max() / (self.op.weight.data ** alpha + 1e-8).abs() # Original
             # return self.weightS.grad.abs() / (self.op.weight.data ** alpha + 1e-8).abs()
-            # return self.weightS.grad.abs() / ((self.op.weight.data * self.scale) ** alpha + 1e-8).abs()
+            # return self.weightS.grad.abs() * self.weightS.grad.abs().max() / ((self.op.weight.data * self.scale) ** alpha + 1e-8).abs()
         if method == "subtract":
             return self.weightS.grad.data.abs() - alpha * self.weightS.grad.data.abs() * (self.op.weight.data ** 2)
         else:
@@ -125,6 +125,8 @@ class SLinear(SModule):
         # xS = self.scale * xS
         if self.op.bias is not None:
             x += self.op.bias
+        if self.op.bias is not None:
+            xS += self.op.bias
         return x, xS
 
 class SConv2d(SModule):
@@ -141,11 +143,15 @@ class SConv2d(SModule):
         # print(self.mask.device)
         # print(self.weightS.device)
         # print(self.op.weight.device)
-        x, xS = self.function(x * self.scale, xS * self.scale, (self.op.weight + self.noise) * self.mask, self.weightS, None, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
+        x, xS = x * self.scale, xS * self.scale
+        x, xS = self.function(x, xS, (self.op.weight + self.noise) * self.mask, self.weightS, None, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
+        # x, xS = self.function(x * self.scale, xS * self.scale, (self.op.weight + self.noise) * self.mask, self.weightS, None, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
         # x = self.scale * x
         # xS = self.scale * xS
         if self.op.bias is not None:
             x += self.op.bias.reshape(1,-1,1,1).expand_as(x)
+        if self.op.bias is not None:
+            xS += self.op.bias.reshape(1,-1,1,1).expand_as(xS)
         return x, xS
 
 class NModule(nn.Module):

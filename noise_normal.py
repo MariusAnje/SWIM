@@ -12,6 +12,7 @@ import argparse
 import os
 
 def CEval():
+    model.eval()
     total = 0
     correct = 0
     model.clear_noise()
@@ -27,6 +28,7 @@ def CEval():
     return (correct/total).cpu().numpy()
 
 def NEval(var):
+    model.eval()
     total = 0
     correct = 0
     model.clear_noise()
@@ -43,6 +45,7 @@ def NEval(var):
     return (correct/total).cpu().numpy()
 
 def NEachEval(var):
+    model.eval()
     total = 0
     correct = 0
     model.clear_noise()
@@ -60,6 +63,7 @@ def NEachEval(var):
     return (correct/total).cpu().numpy()
 
 def NTrain(epochs, header, var, verbose=False):
+    model.train()
     best_acc = 0.0
     for i in range(epochs):
         running_loss = 0.
@@ -83,8 +87,10 @@ def NTrain(epochs, header, var, verbose=False):
         scheduler.step()
 
 def GetSecond():
+    model.eval()
     model.clear_noise()
     optimizer.zero_grad()
+    # for images, labels in tqdm(trainloader):
     for images, labels in trainloader:
         images, labels = images.to(device), labels.to(device)
         # images = images.view(-1, 784)
@@ -249,11 +255,12 @@ if __name__ == "__main__":
             print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
         # loader = range(args.noise_epoch)
         # for _ in loader:
-        #     acc = Seval_noise(args.noise_var)
+        #     acc = NEval(args.noise_var)
         #     mask_acc_list.append(acc)
         # print(f"With mask noise average acc: {np.mean(mask_acc_list):.4f}, std: {np.std(mask_acc_list):.4f}")
         
-        optimizer = optim.SGD(model.parameters(), lr=1e-4)
+        # optimizer = optim.SGD(model.parameters(), lr=1e-5)
+        optimizer = optim.Adam(model.parameters(), lr=1e-5)
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
         NTrain(args.fine_epoch, header_timer, args.noise_var, args.verbose)
 
