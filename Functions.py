@@ -161,7 +161,7 @@ class SBatchNorm2dFunction(autograd.Function):
             bias = 0
             grad_bias = None
         grad_input = grad_output * weight / skr
-        grad_inputS = grad_outputS * (weight**2) / running_var + eps
+        grad_inputS = grad_outputS * (weight**2) / (running_var**2 + eps)
         
 
         return grad_input, grad_inputS, None, None, grad_weight, grad_bias, None, None, None
