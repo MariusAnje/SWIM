@@ -223,7 +223,9 @@ class ResNet(SModel):
     def _forward_impl(self, x: Tensor) -> Tensor:
         # See note [TorchScript super()]
         xS = torch.ones_like(x)
-        x = self.conv1((x, xS))
+        if not self.first_only:
+            x = (x, xS)
+        x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
@@ -234,10 +236,11 @@ class ResNet(SModel):
         x = self.layer4(x)
 
         x = self.avgpool(x)
-        x, xS = x
-        x  = torch.flatten(x, 1)
-        xS = torch.flatten(xS, 1)
-        x = self.fc((x, xS))
+        # x, xS = x
+        # x  = torch.flatten(x, 1)
+        # xS = torch.flatten(xS, 1)
+        x = self.unpack_flattern(x)
+        x = self.fc(x)
 
         return x
 
