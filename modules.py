@@ -138,16 +138,8 @@ class SConv2d(SModule):
 
     def forward(self, xC):
         x, xS = xC
-        # print(x.device)
-        # print(xS.device)
-        # print(self.mask.device)
-        # print(self.weightS.device)
-        # print(self.op.weight.device)
-        x, xS = x * self.scale, xS * self.scale
-        x, xS = self.function(x, xS, (self.op.weight + self.noise) * self.mask, self.weightS, None, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
-        # x, xS = self.function(x * self.scale, xS * self.scale, (self.op.weight + self.noise) * self.mask, self.weightS, None, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
-        # x = self.scale * x
-        # xS = self.scale * xS
+        # x, xS = self.function(x, xS, (self.op.weight + self.noise) * self.mask, self.weightS, None, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
+        x, xS = self.function(x * self.scale, xS * self.scale, (self.op.weight + self.noise) * self.mask, self.weightS, None, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
         if self.op.bias is not None:
             x += self.op.bias.reshape(1,-1,1,1).expand_as(x)
         if self.op.bias is not None:

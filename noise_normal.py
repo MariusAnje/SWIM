@@ -86,6 +86,17 @@ def NTrain(epochs, header, var, verbose=False):
             print(f"epoch: {i:-3d}, test acc: {test_acc:.4f}, loss: {running_loss / len(trainloader):.4f}")
         scheduler.step()
 
+def RecoverBN(var, epoch):
+    model.train()
+    model.clear_noise()
+    for _ in range(epoch):
+        # for images, labels in tqdm(trainloader):
+        for images, labels in trainloader:
+            # model.clear_noise()
+            # model.set_noise(var)
+            images, labels = images.to(device), labels.to(device)
+            outputs, outputsS = model(images)
+
 def GetSecond():
     model.eval()
     model.clear_noise()
@@ -238,7 +249,15 @@ if __name__ == "__main__":
     optimizer = optim.Adam(model.parameters(), lr=0.01)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
     model.clear_noise()
+    # RecoverBN(args.noise_var, 5)
     model.normalize()
+    print(f"No mask no noise: {CEval():.4f}")
+    # no_mask_acc_list = []
+    # loader = range(args.noise_epoch)
+    # for _ in loader:
+    #     acc = NEval(args.noise_var)
+    #     no_mask_acc_list.append(acc)
+    # print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
     GetSecond()
     print(f"S grad before masking: {model.fetch_S_grad().item():E}")
     
@@ -259,8 +278,8 @@ if __name__ == "__main__":
         #     mask_acc_list.append(acc)
         # print(f"With mask noise average acc: {np.mean(mask_acc_list):.4f}, std: {np.std(mask_acc_list):.4f}")
         
-        # optimizer = optim.SGD(model.parameters(), lr=1e-5)
-        optimizer = optim.Adam(model.parameters(), lr=1e-5)
+        optimizer = optim.SGD(model.parameters(), lr=1e-4)
+        # optimizer = optim.Adam(model.parameters(), lr=1e-5)
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
         NTrain(args.fine_epoch, header_timer, args.noise_var, args.verbose)
 
