@@ -21,7 +21,9 @@ def CEval():
             images, labels = images.to(device), labels.to(device)
             # images = images.view(-1, 784)
             outputs = model(images)
-            predictions = outputs[0].argmax(dim=1)
+            if len(outputs) == 2:
+                outputs = outputs[0]
+            predictions = outputs.argmax(dim=1)
             correction = predictions == labels
             correct += correction.sum()
             total += len(correction)
@@ -38,7 +40,9 @@ def NEval(var):
             images, labels = images.to(device), labels.to(device)
             # images = images.view(-1, 784)
             outputs = model(images)
-            predictions = outputs[0].argmax(dim=1)
+            if len(outputs) == 2:
+                outputs = outputs[0]
+            predictions = outputs.argmax(dim=1)
             correction = predictions == labels
             correct += correction.sum()
             total += len(correction)
@@ -56,7 +60,9 @@ def NEachEval(var):
             images, labels = images.to(device), labels.to(device)
             # images = images.view(-1, 784)
             outputs = model(images)
-            predictions = outputs[0].argmax(dim=1)
+            if len(outputs) == 2:
+                outputs = outputs[0]
+            predictions = outputs.argmax(dim=1)
             correction = predictions == labels
             correct += correction.sum()
             total += len(correction)
@@ -74,8 +80,8 @@ def NTrain(epochs, header, var, verbose=False):
             optimizer.zero_grad()
             images, labels = images.to(device), labels.to(device)
             # images = images.view(-1, 784)
-            outputs, outputsS = model(images)
-            loss = criteria(outputs, outputsS,labels)
+            outputs = model(images)
+            loss = criteriaF(outputs,labels)
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
@@ -153,6 +159,8 @@ if __name__ == "__main__":
             help='if to save the files')
     parser.add_argument('--calc_S', action='store',type=str2bool, default=True,
             help='if calculated S grad if not necessary')
+    parser.add_argument('--optimizer', action='store', default="SGD", choices=["SGD", "Adam"],
+            help='optimizer to use')
     args = parser.parse_args()
 
     print(args)
@@ -208,6 +216,7 @@ if __name__ == "__main__":
     model.clear_noise()
     model.clear_mask()
     criteria = SCrossEntropyLoss()
+    criteriaF = torch.nn.CrossEntropyLoss()
 
     # optimizer = optim.Adam(model.parameters(), lr=0.01)
     # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
@@ -250,6 +259,7 @@ if __name__ == "__main__":
     optimizer = optim.Adam(model.parameters(), lr=0.01)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
     model.clear_noise()
+
     # RecoverBN(args.noise_var, 5)
     model.normalize()
     print(f"No mask no noise: {CEval():.4f}")
@@ -267,21 +277,25 @@ if __name__ == "__main__":
         th = model.calc_sail_th(args.mask_p, args.method, args.alpha)
         model.set_mask_sail(th, "th", args.method, args.alpha)
         model.de_normalize()
-        model.to_first_only()
-        print(f"with mask no noise: {CEval():.4f}")
-        # GetSecond()
         print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
         if args.calc_S:
             GetSecond()
             print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
+        model.to_first_only()
+        print(f"with mask no noise: {CEval():.4f}")
+        # GetSecond()
         # loader = range(args.noise_epoch)
         # for _ in loader:
         #     acc = NEval(args.noise_var)
         #     mask_acc_list.append(acc)
         # print(f"With mask noise average acc: {np.mean(mask_acc_list):.4f}, std: {np.std(mask_acc_list):.4f}")
         
-        optimizer = optim.SGD(model.parameters(), lr=1e-4)
-        # optimizer = optim.Adam(model.parameters(), lr=1e-5)
+        if args.optimizer == "SGD":
+            optimizer = optim.SGD(model.parameters(), lr=1e-4)
+        elif args.optimizer == "Adam":
+            optimizer = optim.Adam(model.parameters(), lr=1e-5)
+        else:
+            raise NotImplementedError
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
         NTrain(args.fine_epoch, header_timer, args.noise_var, args.verbose)
 
@@ -296,6 +310,9 @@ if __name__ == "__main__":
         print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
         model.clear_noise()
         if args.calc_S:
+            model.from_first_back_second()
+            model.to(device)
+            model.push_S_device()
             GetSecond()
             print(f"S grad after finetune: {model.fetch_S_grad().item():E}")
         os.system(f"rm tmp_best_{header_timer}.pt")

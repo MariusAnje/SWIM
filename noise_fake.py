@@ -63,6 +63,7 @@ def NTrain(epochs, header, var, verbose=False):
     best_acc = 0.0
     for i in range(epochs):
         running_loss = 0.
+        # for images, labels in tqdm(trainloader):
         for images, labels in trainloader:
             model.clear_noise()
             model.set_noise(var)
@@ -166,6 +167,7 @@ if __name__ == "__main__":
         model = resnetN.resnet18(num_classes = 10)
 
     model.to(device)
+    model.push_S_device()
     model.clear_noise()
     criteria = torch.nn.CrossEntropyLoss()
 

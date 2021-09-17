@@ -175,6 +175,10 @@ class NModule(nn.Module):
     
     def clear_noise(self):
         self.noise = torch.zeros_like(self.op.weight)
+    
+    def push_S_device(self):
+        self.mask = self.mask.to(self.op.weight.device)
+        self.noise = self.noise.to(self.op.weight.device)
 
 class NLinear(NModule):
     def __init__(self, in_features, out_features, bias=True):
@@ -293,6 +297,11 @@ class NModel(nn.Module):
         for m in self.modules():
             if isinstance(m, NModule):
                 m.clear_noise()
+    
+    def push_S_device(self):
+        for m in self.modules():
+            if isinstance(m, NLinear) or isinstance(m, NConv2d):
+                m.push_S_device()
 
 class SModel(nn.Module):
     def __init__(self):
@@ -413,6 +422,9 @@ class SModel(nn.Module):
     
     def to_first_only(self):
         self.first_only = True
+        for m in self.modules():
+            if isinstance(m, SModel):
+                m.first_only = True
         for n, m in self.named_modules():
             if isinstance(m, SModule):
                 n = n.split(".")
@@ -433,6 +445,9 @@ class SModel(nn.Module):
 
     def from_first_back_second(self):
         self.first_only = False
+        for m in self.modules():
+            if isinstance(m, SModel):
+                m.first_only = False
         for n, m in self.named_modules():
             if isinstance(m, NModule):
                 n = n.split(".")
@@ -451,6 +466,12 @@ class SModel(nn.Module):
                     new = SReLU(m.inplace)
                 elif isinstance(m, nn.MaxPool2d):
                     new = SMaxpool2D(m.kernel_size, m.stride, m.padding, m.dilation, True, m.ceil_mode)
+                elif isinstance(m, nn.AdaptiveAvgPool2d):
+                    new = SAdaptiveAvgPool2d(m.output_size)
+                    new.op = m
+                elif isinstance(m, nn.BatchNorm2d):
+                    new = SBatchNorm2d(m.num_features)
+                    new.op = m
                 # TODO: Other modules specified above
                 father._modules[n[-1]] = new
 
