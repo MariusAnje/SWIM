@@ -169,8 +169,9 @@ class NModule(nn.Module):
     def set_noise(self, var, N, m):
         noise = torch.zeros_like(self.noise)
         scale = self.op.weight.abs().max()
-        for i in range(1, N//m + 1):
-            noise += torch.normal(mean=0., std=var, size=self.noise.size(), device=noise.device) * (pow(2, - i*m))
+        if var !=0:
+            for i in range(1, N//m + 1):
+                noise += torch.normal(mean=0., std=var, size=self.noise.size(), device=noise.device) * (pow(2, - i*m))
         self.noise = noise.to(self.op.weight.device) * scale
     
     def clear_noise(self):
@@ -300,7 +301,8 @@ class NModel(nn.Module):
     
     def push_S_device(self):
         for m in self.modules():
-            if isinstance(m, NLinear) or isinstance(m, NConv2d):
+            if isinstance(m, NModule):
+            # if isinstance(m, NLinear) or isinstance(m, NConv2d):
                 m.push_S_device()
 
 class SModel(nn.Module):

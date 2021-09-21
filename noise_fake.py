@@ -12,6 +12,7 @@ import argparse
 import os
 
 def CEval():
+    model.eval()
     total = 0
     correct = 0
     model.clear_noise()
@@ -27,6 +28,7 @@ def CEval():
     return (correct/total).cpu().numpy()
 
 def NEval(var):
+    model.eval()
     total = 0
     correct = 0
     model.clear_noise()
@@ -43,6 +45,7 @@ def NEval(var):
     return (correct/total).cpu().numpy()
 
 def NEachEval(var):
+    model.eval()
     total = 0
     correct = 0
     model.clear_noise()
@@ -60,6 +63,7 @@ def NEachEval(var):
     return (correct/total).cpu().numpy()
 
 def NTrain(epochs, header, var, verbose=False):
+    model.train()
     best_acc = 0.0
     for i in range(epochs):
         running_loss = 0.
@@ -84,6 +88,7 @@ def NTrain(epochs, header, var, verbose=False):
         scheduler.step()
 
 def GetSecond():
+    model.eval()
     model.clear_noise()
     optimizer.zero_grad()
     for images, labels in trainloader:
@@ -174,8 +179,11 @@ if __name__ == "__main__":
     # optimizer = optim.Adam(model.parameters(), lr=0.01)
     # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
 
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [60])
+    # optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [60])
+
+    optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.train_epoch)
 
     NTrain(args.train_epoch, header, args.noise_var, args.verbose)
     state_dict = torch.load(f"tmp_best_{header}.pt")
