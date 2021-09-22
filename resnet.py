@@ -171,7 +171,9 @@ class ResNet(SModel):
                              "or a 3-element tuple, got {}".format(replace_stride_with_dilation))
         self.groups = groups
         self.base_width = width_per_group
-        self.conv1 = SConv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
+        # self.conv1 = SConv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
+                            #    bias=False)
+        self.conv1 = SConv2d(3, self.inplanes, kernel_size=3, stride=1, padding=1,
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
         self.relu = SReLU(inplace=True)
@@ -236,7 +238,7 @@ class ResNet(SModel):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
-        x = self.maxpool(x)
+        # x = self.maxpool(x)
 
         x = self.layer1(x)
         x = self.layer2(x)

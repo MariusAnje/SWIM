@@ -63,9 +63,9 @@ def NEachEval(var):
     return (correct/total).cpu().numpy()
 
 def NTrain(epochs, header, var, verbose=False):
-    model.train()
     best_acc = 0.0
     for i in range(epochs):
+        model.train()
         running_loss = 0.
         # for images, labels in tqdm(trainloader):
         for images, labels in trainloader:
