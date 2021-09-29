@@ -108,8 +108,8 @@ def GetSecond():
     model.eval()
     model.clear_noise()
     optimizer.zero_grad()
-    # for images, labels in tqdm(trainloader):
-    for images, labels in trainloader:
+    # for images, labels in tqdm(secondloader):
+    for images, labels in secondloader:
         images, labels = images.to(device), labels.to(device)
         # images = images.view(-1, 784)
         outputs, outputsS = model(images)
@@ -141,7 +141,7 @@ if __name__ == "__main__":
             help='device used')
     parser.add_argument('--verbose', action='store', type=str2bool, default=False,
             help='see training process')
-    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR", "Res18"],
+    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR", "Res18", "TIN"],
             help='model to use')
     parser.add_argument('--method', action='store', default="second", choices=["second", "magnitude", "saliency", "r_saliency", "subtract"],
             help='method used to calculate saliency')
@@ -161,6 +161,8 @@ if __name__ == "__main__":
             help='if calculated S grad if not necessary')
     parser.add_argument('--optimizer', action='store', default="SGD", choices=["SGD", "Adam"],
             help='optimizer to use')
+    parser.add_argument('--div', action='store', type=int, default=1,
+            help='division points for second')
     args = parser.parse_args()
 
     print(args)
@@ -172,17 +174,7 @@ if __name__ == "__main__":
 
     BS = 128
 
-    if not (args.model == "CIFAR" or args.model == "Res18"):
-        trainset = torchvision.datasets.MNIST(root='~/Private/data', train=True,
-                                                download=False, transform=transforms.ToTensor())
-        trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS,
-                                                shuffle=True, num_workers=2)
-
-        testset = torchvision.datasets.MNIST(root='~/Private/data', train=False,
-                                            download=False, transform=transforms.ToTensor())
-        testloader = torch.utils.data.DataLoader(testset, batch_size=BS,
-                                                    shuffle=False, num_workers=2)
-    else:
+    if args.model == "CIFAR" or args.model == "Res18":
         normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
         transform = transforms.Compose(
         [transforms.ToTensor(),
@@ -198,6 +190,34 @@ if __name__ == "__main__":
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS, shuffle=True, num_workers=4)
         testset = torchvision.datasets.CIFAR10(root='~/Private/data', train=False, download=False, transform=transform)
         testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=4)
+    elif args.model == "TIN":
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225])
+        transform = transforms.Compose(
+                [transforms.ToTensor(),
+                 normalize,
+                ])
+        train_transform = transforms.Compose([
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomCrop(64, 4),
+                transforms.ToTensor(),
+                normalize,
+                ])
+        trainset = torchvision.datasets.ImageFolder(root='~/Private/data/tiny-imagenet-200/train', transform=train_transform)
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS, shuffle=True, num_workers=4)
+        secondloader = torch.utils.data.DataLoader(trainset, batch_size=BS//args.div, shuffle=False, num_workers=4)
+        testset = torchvision.datasets.ImageFolder(root='~/Private/data/tiny-imagenet-200/val',  transform=transform)
+        testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=4)
+    else:
+        trainset = torchvision.datasets.MNIST(root='~/Private/data', train=True,
+                                                download=False, transform=transforms.ToTensor())
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS,
+                                                shuffle=True, num_workers=2)
+
+        testset = torchvision.datasets.MNIST(root='~/Private/data', train=False,
+                                            download=False, transform=transforms.ToTensor())
+        testloader = torch.utils.data.DataLoader(testset, batch_size=BS,
+                                                    shuffle=False, num_workers=2)
 
 
     if args.model == "MLP3":
@@ -207,9 +227,11 @@ if __name__ == "__main__":
     elif args.model == "LeNet":
         model = SLeNet()
     elif args.model == "CIFAR":
-        model = CIFAR()
+        model = FakeCIFAR()
     elif args.model == "Res18":
         model = resnet.resnet18(num_classes = 10)
+    elif args.model == "TIN":
+        model = resnet.resnet18(num_classes = 200)
 
     model.to(device)
     model.push_S_device()
@@ -283,6 +305,7 @@ if __name__ == "__main__":
             print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
         model.to_first_only()
         print(f"with mask no noise: {CEval():.4f}")
+        exit()
         # GetSecond()
         # loader = range(args.noise_epoch)
         # for _ in loader:

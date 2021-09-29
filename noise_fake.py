@@ -132,16 +132,22 @@ if __name__ == "__main__":
 
     BS = 128
 
-    if not (args.model == "CIFAR" or args.model == "Res18" or args.model == "TIN"):
-        trainset = torchvision.datasets.MNIST(root='~/Private/data', train=True,
-                                                download=False, transform=transforms.ToTensor())
-        trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS,
-                                                shuffle=True, num_workers=2)
-
-        testset = torchvision.datasets.MNIST(root='~/Private/data', train=False,
-                                            download=False, transform=transforms.ToTensor())
-        testloader = torch.utils.data.DataLoader(testset, batch_size=BS,
-                                                    shuffle=False, num_workers=2)
+    if args.model == "CIFAR" or args.model == "Res18":
+        normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
+        transform = transforms.Compose(
+        [transforms.ToTensor(),
+        #  transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+            normalize])
+        train_transform = transforms.Compose([
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomCrop(32, 4),
+                transforms.ToTensor(),
+                normalize,
+                ])
+        trainset = torchvision.datasets.CIFAR10(root='~/Private/data', train=True, download=False, transform=train_transform)
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS, shuffle=True, num_workers=4)
+        testset = torchvision.datasets.CIFAR10(root='~/Private/data', train=False, download=False, transform=transform)
+        testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=4)
     elif args.model == "TIN":
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])
@@ -160,21 +166,15 @@ if __name__ == "__main__":
         testset = torchvision.datasets.ImageFolder(root='~/Private/data/tiny-imagenet-200/val',  transform=transform)
         testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=4)
     else:
-        normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
-        transform = transforms.Compose(
-        [transforms.ToTensor(),
-        #  transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-            normalize])
-        train_transform = transforms.Compose([
-                transforms.RandomHorizontalFlip(),
-                transforms.RandomCrop(32, 4),
-                transforms.ToTensor(),
-                normalize,
-                ])
-        trainset = torchvision.datasets.CIFAR10(root='~/Private/data', train=True, download=False, transform=train_transform)
-        trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS, shuffle=True, num_workers=4)
-        testset = torchvision.datasets.CIFAR10(root='~/Private/data', train=False, download=False, transform=transform)
-        testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=4)
+        trainset = torchvision.datasets.MNIST(root='~/Private/data', train=True,
+                                                download=False, transform=transforms.ToTensor())
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS,
+                                                shuffle=True, num_workers=2)
+
+        testset = torchvision.datasets.MNIST(root='~/Private/data', train=False,
+                                            download=False, transform=transforms.ToTensor())
+        testloader = torch.utils.data.DataLoader(testset, batch_size=BS,
+                                                    shuffle=False, num_workers=2)
 
 
     if args.model == "MLP3":
