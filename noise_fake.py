@@ -119,7 +119,7 @@ if __name__ == "__main__":
             help='device used')
     parser.add_argument('--verbose', action='store', type=str2bool, default=False,
             help='see training process')
-    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR", "Res18"],
+    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR", "Res18", "TIN"],
             help='model to use')
     args = parser.parse_args()
 
@@ -132,7 +132,7 @@ if __name__ == "__main__":
 
     BS = 128
 
-    if not (args.model == "CIFAR" or args.model == "Res18"):
+    if not (args.model == "CIFAR" or args.model == "Res18" or args.model == "TIN"):
         trainset = torchvision.datasets.MNIST(root='~/Private/data', train=True,
                                                 download=False, transform=transforms.ToTensor())
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS,
@@ -142,6 +142,23 @@ if __name__ == "__main__":
                                             download=False, transform=transforms.ToTensor())
         testloader = torch.utils.data.DataLoader(testset, batch_size=BS,
                                                     shuffle=False, num_workers=2)
+    elif args.model == "TIN":
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225])
+        transform = transforms.Compose(
+                [transforms.ToTensor(),
+                 normalize,
+                ])
+        train_transform = transforms.Compose([
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomCrop(64, 4),
+                transforms.ToTensor(),
+                normalize,
+                ])
+        trainset = torchvision.datasets.ImageFolder(root='~/Private/data/tiny-imagenet-200/train', transform=train_transform)
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS, shuffle=True, num_workers=4)
+        testset = torchvision.datasets.ImageFolder(root='~/Private/data/tiny-imagenet-200/val',  transform=transform)
+        testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=4)
     else:
         normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
         transform = transforms.Compose(
@@ -170,6 +187,8 @@ if __name__ == "__main__":
         model = FakeCIFAR()
     elif args.model == "Res18":
         model = resnetN.resnet18(num_classes = 10)
+    elif args.model == "TIN":
+        model = resnetN.resnet18(num_classes = 200)
 
     model.to(device)
     model.push_S_device()
