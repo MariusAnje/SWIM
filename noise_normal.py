@@ -19,7 +19,9 @@ def CEval():
             images, labels = images.to(device), labels.to(device)
             # images = images.view(-1, 784)
             outputs = model(images)
-            predictions = outputs[0].argmax(dim=1)
+            if len(outputs) == 2:
+                outputs = outputs[0]
+            predictions = outputs.argmax(dim=1)
             correction = predictions == labels
             correct += correction.sum()
             total += len(correction)
@@ -35,7 +37,9 @@ def NEval(var):
             images, labels = images.to(device), labels.to(device)
             # images = images.view(-1, 784)
             outputs = model(images)
-            predictions = outputs[0].argmax(dim=1)
+            if len(outputs) == 2:
+                outputs = outputs[0]
+            predictions = outputs.argmax(dim=1)
             correction = predictions == labels
             correct += correction.sum()
             total += len(correction)
@@ -52,7 +56,9 @@ def NEachEval(var):
             images, labels = images.to(device), labels.to(device)
             # images = images.view(-1, 784)
             outputs = model(images)
-            predictions = outputs[0].argmax(dim=1)
+            if len(outputs) == 2:
+                outputs = outputs[0]
+            predictions = outputs.argmax(dim=1)
             correction = predictions == labels
             correct += correction.sum()
             total += len(correction)
@@ -62,14 +68,17 @@ def NTrain(epochs, header, var, verbose=False):
     best_acc = 0.0
     for i in range(epochs):
         running_loss = 0.
+        # for images, labels in tqdm(trainloader):
         for images, labels in trainloader:
             model.clear_noise()
             model.set_noise(var)
             optimizer.zero_grad()
             images, labels = images.to(device), labels.to(device)
             # images = images.view(-1, 784)
-            outputs, outputsS = model(images)
-            loss = criteria(outputs, outputsS,labels)
+            # outputs, outputsS = model(images)
+            # loss = criteria(outputs, outputsS,labels)
+            outputs = model(images)
+            loss = criteriaF(outputs, labels)
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
@@ -84,6 +93,7 @@ def NTrain(epochs, header, var, verbose=False):
 def GetSecond():
     model.clear_noise()
     optimizer.zero_grad()
+    # for images, labels in tqdm(trainloader):
     for images, labels in trainloader:
         images, labels = images.to(device), labels.to(device)
         # images = images.view(-1, 784)
@@ -187,6 +197,7 @@ if __name__ == "__main__":
     model.clear_noise()
     model.clear_mask()
     criteria = SCrossEntropyLoss()
+    criteriaF = torch.nn.CrossEntropyLoss()
 
     # optimizer = optim.Adam(model.parameters(), lr=0.01)
     # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
@@ -194,9 +205,15 @@ if __name__ == "__main__":
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [60])
     if not args.pretrained:
+        model.to_first_only()
+        model.to(device)
+        model.push_S_device()
         NTrain(args.train_epoch, header, args.noise_var, args.verbose)
         state_dict = torch.load(f"tmp_best_{header}.pt")
         model.load_state_dict(state_dict)
+        model.from_first_back_second()
+        model.to(device)
+        model.push_S_device()
         torch.save(model.state_dict(), f"saved_B_{header}.pt")
 
         no_mask_acc_list = []
@@ -240,6 +257,7 @@ if __name__ == "__main__":
         model.de_normalize()
         print(f"with mask no noise: {CEval():.4f}")
         # GetSecond()
+        exit()
         print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
         if args.calc_S:
             GetSecond()
@@ -250,9 +268,15 @@ if __name__ == "__main__":
         #     mask_acc_list.append(acc)
         # print(f"With mask noise average acc: {np.mean(mask_acc_list):.4f}, std: {np.std(mask_acc_list):.4f}")
         
+        model.to_first_only()
+        model.to(device)
+        model.push_S_device()
         optimizer = optim.SGD(model.parameters(), lr=1e-4)
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
         NTrain(args.fine_epoch, header_timer, args.noise_var, args.verbose)
+        model.from_first_back_second()
+        model.to(device)
+        model.push_S_device()
 
         if args.save_file:
             torch.save(model.state_dict(), f"saved_A_{header}_{header_timer}.pt")
@@ -267,4 +291,4 @@ if __name__ == "__main__":
         if args.calc_S:
             GetSecond()
             print(f"S grad after finetune: {model.fetch_S_grad().item():E}")
-        os.system(f"rm tmp_best_{header_timer}.pt")
+    os.system(f"rm tmp_best_{header_timer}.pt")

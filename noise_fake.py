@@ -182,6 +182,7 @@ if __name__ == "__main__":
 
     model.to(device)
     model.clear_noise()
+    model.push_S_device()
     criteria = torch.nn.CrossEntropyLoss()
 
     # optimizer = optim.Adam(model.parameters(), lr=0.01)
