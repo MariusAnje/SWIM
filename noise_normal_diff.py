@@ -118,7 +118,9 @@ if __name__ == "__main__":
             help='# of epochs of finetuning')
     parser.add_argument('--noise_epoch', action='store', type=int, default=100,
             help='# of epochs of noise validations')
-    parser.add_argument('--noise_var', action='store', type=float, default=0.1,
+    parser.add_argument('--train_var', action='store', type=float, default=0.1,
+            help='noise variation')
+    parser.add_argument('--test_var', action='store', type=float, default=0.1,
             help='noise variation')
     parser.add_argument('--mask_p', action='store', type=float, default=0.01,
             help='portion of the mask')
@@ -208,7 +210,7 @@ if __name__ == "__main__":
         model.to_first_only()
         model.to(device)
         model.push_S_device()
-        NTrain(args.train_epoch, header, args.noise_var, args.verbose)
+        NTrain(args.train_epoch, header, args.train_var, args.verbose)
         state_dict = torch.load(f"tmp_best_{header}.pt")
         model.load_state_dict(state_dict)
         model.from_first_back_second()
@@ -223,16 +225,16 @@ if __name__ == "__main__":
         model.clear_mask()
         loader = range(args.noise_epoch)
         for _ in loader:
-            acc = NEval(args.noise_var)
+            acc = NEval(args.test_var)
             no_mask_acc_list.append(acc)
         print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
-        torch.save(no_mask_acc_list, f"no_mask_list_{header}_{args.noise_var}.pt")
+        torch.save(no_mask_acc_list, f"no_mask_list_{header}_{args.train_var}.pt")
 
         # exit()
     else:
         parent_path = args.model_path
         header = args.header
-        no_mask_acc_list = torch.load(os.path.join(parent_path, f"no_mask_list_{header}_{args.noise_var}.pt"))
+        no_mask_acc_list = torch.load(os.path.join(parent_path, f"no_mask_list_{header}_{args.train_var}.pt"))
         print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
         model.back_real(device)
         model.push_S_device()
@@ -263,7 +265,7 @@ if __name__ == "__main__":
             print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
         # loader = range(args.noise_epoch)
         # for _ in loader:
-        #     acc = Seval_noise(args.noise_var)
+        #     acc = Seval_noise(args.test_var)
         #     mask_acc_list.append(acc)
         # print(f"With mask noise average acc: {np.mean(mask_acc_list):.4f}, std: {np.std(mask_acc_list):.4f}")
         
@@ -272,7 +274,7 @@ if __name__ == "__main__":
         model.push_S_device()
         optimizer = optim.SGD(model.parameters(), lr=1e-4)
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
-        NTrain(args.fine_epoch, header_timer, args.noise_var, args.verbose)
+        NTrain(args.fine_epoch, header_timer, args.test_var, args.verbose)
         model.from_first_back_second()
         model.to(device)
         model.push_S_device()
@@ -283,7 +285,7 @@ if __name__ == "__main__":
         print(f"Finetune no noise: {CEval():.4f}")
         loader = range(args.noise_epoch)
         for _ in loader:
-            acc = NEval(args.noise_var)
+            acc = NEval(args.test_var)
             fine_mask_acc_list.append(acc)
         print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
         model.clear_noise()
