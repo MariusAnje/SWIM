@@ -98,8 +98,10 @@ def NTrain(epochs, header, var, verbose=False):
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
-        # test_acc = NEachEval(var)
-        test_acc = NKeepEval(var)
+        if args.NE:
+            test_acc = NEachEval(var)
+        else:
+            test_acc = NKeepEval(var)
         if test_acc > best_acc:
             best_acc = test_acc
             torch.save(model.state_dict(), f"tmp_best_{header}.pt")
@@ -161,6 +163,10 @@ if __name__ == "__main__":
             help='if to save the files')
     parser.add_argument('--calc_S', action='store',type=str2bool, default=True,
             help='if calculated S grad if not necessary')
+    parser.add_argument('--T_first', action='store',type=str2bool, default=False,
+            help='if train the network using vanila training first')
+    parser.add_argument('--NE', action='store',type=str2bool, default=False,
+            help='True --> NEachEval & NEval; False --> NKeepEval')
     args = parser.parse_args()
 
     print(args)
@@ -238,8 +244,15 @@ if __name__ == "__main__":
         # print(f"No mask no noise: {CEval():.4f}")
         model.load_state_dict(state_dict)
         model.clear_mask()
-        acc = NKeepEval(args.noise_var)
-        print(f"No mask noise acc: {acc:.4f}")
+        if args.NE:
+            loader = range(args.noise_epoch)
+            for _ in loader:
+                acc = NEval(args.noise_var)
+                no_mask_acc_list.append(acc)
+            print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
+        else:
+            acc = NKeepEval(args.noise_var)
+            print(f"No mask noise acc: {acc:.4f}")
 
         # exit()
     else:
