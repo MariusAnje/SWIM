@@ -80,6 +80,31 @@ def NKeepEval(var):
             total += len(correction)
     return (correct/total).cpu().numpy()
 
+def TTrain(epochs, header, verbose=False):
+    best_acc = 0.0
+    model.clear_noise()
+    for i in range(epochs):
+        running_loss = 0.
+        # for images, labels in tqdm(trainloader):
+        for images, labels in trainloader:
+            optimizer.zero_grad()
+            images, labels = images.to(device), labels.to(device)
+            # images = images.view(-1, 784)
+            # outputs, outputsS = model(images)
+            # loss = criteria(outputs, outputsS,labels)
+            outputs = model(images)
+            loss = criteriaF(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            running_loss += loss.item()
+        test_acc = CEval()
+        if test_acc > best_acc:
+            best_acc = test_acc
+            torch.save(model.state_dict(), f"tmp_best_{header}.pt")
+        if verbose:
+            print(f"epoch: {i:-3d}, test acc: {test_acc:.4f}, loss: {running_loss / len(trainloader):.4f}")
+        scheduler.step()
+
 def NTrain(epochs, header, var, verbose=False):
     best_acc = 0.0
     for i in range(epochs):
@@ -231,6 +256,10 @@ if __name__ == "__main__":
         model.to_first_only()
         model.to(device)
         model.push_S_device()
+        if args.T_first:
+            TTrain(args.train_epoch//3, header, False)
+            state_dict = torch.load(f"tmp_best_{header}.pt")
+            print(f"Vanila train acc: {CEval():.4f}")
         NTrain(args.train_epoch, header, args.noise_var, args.verbose)
         state_dict = torch.load(f"tmp_best_{header}.pt")
         model.load_state_dict(state_dict)
