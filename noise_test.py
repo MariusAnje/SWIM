@@ -160,13 +160,14 @@ if __name__ == "__main__":
     parent_path = args.model_path
     header = args.header
     state_dict = torch.load(os.path.join(parent_path, f"saved_B_{header}.pt"), map_location=device)
-    print(state_dict.keys())
     model.load_state_dict(state_dict)
+    model.to(device)
     model.push_S_device()
-    print(f"No noise acc: {CEval()}")
-    fine_mask_acc_list = []
-    loader = range(args.noise_epoch)
-    for _ in loader:
-        acc = NEval(args.test_var)
-        fine_mask_acc_list.append(acc)
-    print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
+    print(f"No noise acc: {CEval():.4f}")
+    for test_var in np.arange(0.1, 1, 0.1):
+        fine_mask_acc_list = []
+        loader = range(args.noise_epoch)
+        for _ in loader:
+            acc = NEval(test_var)
+            fine_mask_acc_list.append(acc)
+        print(f"Noise {test_var:.2f}, average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
