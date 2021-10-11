@@ -257,21 +257,25 @@ if __name__ == "__main__":
         model.to(device)
         model.push_S_device()
         if args.T_first:
-            TTrain(args.train_epoch//3, header, False)
+            TTrain(15, header, False)
             state_dict = torch.load(f"tmp_best_{header}.pt")
+            model.load_state_dict(state_dict)
             print(f"Vanila train acc: {CEval():.4f}")
+        
+        optimizer = optim.SGD(model.parameters(), lr=1e-4, momentum=0.9)
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [60])
         NTrain(args.train_epoch, header, args.noise_var, args.verbose)
         state_dict = torch.load(f"tmp_best_{header}.pt")
         model.load_state_dict(state_dict)
         model.from_first_back_second()
         model.to(device)
         model.push_S_device()
-        torch.save(model.state_dict(), f"saved_B_{header}.pt")
+        # torch.save(model.state_dict(), f"saved_B_{header}.pt")
 
         no_mask_acc_list = []
-        state_dict = torch.load(f"saved_B_{header}.pt")
+        # state_dict = torch.load(f"saved_B_{header}.pt")
         # print(f"No mask no noise: {CEval():.4f}")
-        model.load_state_dict(state_dict)
+        # model.load_state_dict(state_dict)
         model.clear_mask()
         if args.NE:
             loader = range(args.noise_epoch)
@@ -283,7 +287,7 @@ if __name__ == "__main__":
             acc = NKeepEval(args.noise_var)
             print(f"No mask noise acc: {acc:.4f}")
 
-        # exit()
+        exit()
     else:
         parent_path = args.model_path
         header = args.header
