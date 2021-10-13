@@ -118,6 +118,13 @@ class SModule(nn.Module):
         if self.op.bias is not None:
             self.op.bias.data = self.op.bias.data / scale
 
+class nn2S(nn.Module):
+    def __init__(self):
+        super().__init__()
+    
+    def forward(self, x):
+        return x, torch.ones_like(x)
+
 class SLinear(SModule):
     def __init__(self, in_features, out_features, bias=True):
         super().__init__()
