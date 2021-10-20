@@ -130,7 +130,7 @@ if __name__ == "__main__":
     
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
 
-    BS = 128
+    BS = 64
 
     if args.model == "CIFAR" or args.model == "Res18":
         normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
@@ -188,7 +188,7 @@ if __name__ == "__main__":
     elif args.model == "Res18":
         model = resnetN.resnet18(num_classes = 10)
     elif args.model == "TIN":
-        model = resnetN.resnet18(num_classes = 200)
+        model = resnetN.resnet101(num_classes = 200)
 
     model.to(device)
     model.push_S_device()

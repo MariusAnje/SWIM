@@ -188,6 +188,7 @@ if __name__ == "__main__":
                 ])
         trainset = torchvision.datasets.CIFAR10(root='~/Private/data', train=True, download=False, transform=train_transform)
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS, shuffle=True, num_workers=4)
+        secondloader = torch.utils.data.DataLoader(trainset, batch_size=BS//args.div, shuffle=False, num_workers=4)
         testset = torchvision.datasets.CIFAR10(root='~/Private/data', train=False, download=False, transform=transform)
         testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=4)
     elif args.model == "TIN":
@@ -213,6 +214,8 @@ if __name__ == "__main__":
                                                 download=False, transform=transforms.ToTensor())
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS,
                                                 shuffle=True, num_workers=2)
+        secondloader = torch.utils.data.DataLoader(trainset, batch_size=BS//args.div,
+                                                shuffle=False, num_workers=2)
 
         testset = torchvision.datasets.MNIST(root='~/Private/data', train=False,
                                             download=False, transform=transforms.ToTensor())
@@ -305,7 +308,6 @@ if __name__ == "__main__":
             print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
         model.to_first_only()
         print(f"with mask no noise: {CEval():.4f}")
-        exit()
         # GetSecond()
         # loader = range(args.noise_epoch)
         # for _ in loader:
