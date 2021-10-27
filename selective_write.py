@@ -6,6 +6,7 @@ import numpy as np
 from models import SCrossEntropyLoss, SMLP3, SMLP4, SLeNet, CIFAR, FakeSCrossEntropyLoss
 from qmodels import QSLeNet, QCIFAR
 import resnet
+import qresnet
 from modules import SModule
 from tqdm import tqdm
 import time
@@ -142,11 +143,11 @@ if __name__ == "__main__":
             help='device used')
     parser.add_argument('--verbose', action='store', type=str2bool, default=False,
             help='see training process')
-    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR", "Res18", "TIN", "QLeNet", "QCIFAR"],
+    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR", "Res18", "TIN", "QLeNet", "QCIFAR", "QRes18", "QTIN"],
             help='model to use')
-    parser.add_argument('--method', action='store', default="second", choices=["second", "magnitude", "saliency", "random"],
+    parser.add_argument('--method', action='store', default="SM", choices=["second", "magnitude", "saliency", "random", "SM"],
             help='method used to calculate saliency')
-    parser.add_argument('--alpha', action='store', type=float, default=1.0,
+    parser.add_argument('--alpha', action='store', type=float, default=1e6,
             help='weight used in saliency - substract')
     parser.add_argument('--header', action='store',type=int, default=1,
             help='use which saved state dict')
@@ -173,7 +174,7 @@ if __name__ == "__main__":
 
     BS = 128
 
-    if args.model == "CIFAR" or args.model == "Res18":
+    if args.model == "CIFAR" or args.model == "Res18" or args.model == "QCIFAR" or args.model == "QRes18":
         normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
         transform = transforms.Compose(
         [transforms.ToTensor(),
@@ -190,7 +191,7 @@ if __name__ == "__main__":
         secondloader = torch.utils.data.DataLoader(trainset, batch_size=BS//args.div, shuffle=False, num_workers=4)
         testset = torchvision.datasets.CIFAR10(root='~/Private/data', train=False, download=False, transform=transform)
         testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=4)
-    elif args.model == "TIN":
+    elif args.model == "TIN" or args.model == "QTIN":
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])
         transform = transforms.Compose(
@@ -238,6 +239,12 @@ if __name__ == "__main__":
         model = QSLeNet()
     elif args.model == "QCIFAR":
         model = QCIFAR()
+    elif args.model == "QRes18":
+        model = qresnet.resnet18(num_classes = 10)
+    elif args.model == "QTIN":
+        model = qresnet.resnet18(num_classes = 200)
+    else:
+        NotImplementedError
 
     model.to(device)
     model.push_S_device()
@@ -249,8 +256,13 @@ if __name__ == "__main__":
     # optimizer = optim.Adam(model.parameters(), lr=0.01)
     # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
 
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [60])
+    if "TIN" in args.model or "Res" in args.model:
+        optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.train_epoch)
+    else:
+        optimizer = optim.Adam(model.parameters(), lr=1e-3)
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [60])
+
     if not args.pretrained:
         model.to_first_only()
         NTrain(args.train_epoch, header, args.train_var, 0.0, args.verbose)
@@ -316,11 +328,9 @@ if __name__ == "__main__":
     if args.use_mask:
         model.clear_mask()
         mask_acc_list = []
-        if args.method == "random":
-            model.set_mask_sail(args.mask_p, "random", None)
-        else:
-            th = model.calc_sail_th(args.mask_p, args.method, args.alpha)
-            model.set_mask_sail(th, "th", args.method, args.alpha)
+        th = model.calc_sail_th(args.mask_p, args.method, args.alpha)
+        model.set_mask_sail(th, "th", args.method, args.alpha)
+        print(th)
         total, RM_new = model.get_mask_info()
         print(f"Weights removed: {RM_new/total:f}")
         model.de_normalize()

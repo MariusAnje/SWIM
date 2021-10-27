@@ -94,7 +94,7 @@ class QSLeNet(SModel):
         return num_features
 
 class QCIFAR(SModel):
-    def __init__(self, N=4):
+    def __init__(self, N=6):
         super().__init__()
 
         self.conv1 = QSConv2d(N, 3, 64, 3, padding=1)

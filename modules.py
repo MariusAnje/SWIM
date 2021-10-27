@@ -53,6 +53,8 @@ class SModule(nn.Module):
             return self.weightS.grad.abs() * self.op.weight.abs().max() / (self.op.weight.data ** alpha + 1e-8).abs()
         if method == "subtract":
             return self.weightS.grad.data.abs() - alpha * self.weightS.grad.data.abs() * (self.op.weight.data ** 2)
+        if method == "SM":
+            return self.weightS.grad.data.abs() * alpha - self.op.weight.data.abs()
         else:
             raise NotImplementedError(f"method {method} not supported")
     
@@ -387,6 +389,8 @@ class SModel(nn.Module):
                     sail_list = sail
                 else:
                     sail_list = torch.cat([sail_list, sail])
+        # import time
+        # torch.save(sail_list, f"S_grad_{time.time()}.pt")
         th = torch.quantile(sail_list, 1-quantile)
         # print(th)
         return th

@@ -28,7 +28,7 @@ class QSLinear(SModule):
             x += quant(self.N, self.op.bias)
         if self.op.bias is not None:
             xS += self.op.bias
-        return x, xS
+        return quant(self.N, x), xS
 
 class QSConv2d(SModule):
     def __init__(self, N, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros'):
@@ -52,7 +52,7 @@ class QSConv2d(SModule):
             x += quant(self.N, self.op.bias).reshape(1,-1,1,1).expand_as(x)
         if self.op.bias is not None:
             xS += self.op.bias.reshape(1,-1,1,1).expand_as(xS)
-        return x, xS
+        return quant(self.N, x), xS
 
 class QNLinear(NModule):
     def __init__(self, N, in_features, out_features, bias=True):
@@ -72,7 +72,7 @@ class QNLinear(NModule):
 
     def forward(self, x):
         x = self.function(x, quant(self.N, self.op.weight) + self.noise, self.op.bias)
-        return x
+        return quant(self.N, x)
 
 class QNConv2d(NModule):
     def __init__(self, N, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros'):
@@ -92,4 +92,4 @@ class QNConv2d(NModule):
 
     def forward(self, x):
         x = self.function(x, quant(self.N, self.op.weight) + self.noise, self.op.bias, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
-        return x
+        return quant(self.N, x)
