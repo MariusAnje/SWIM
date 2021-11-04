@@ -3,7 +3,7 @@ from torch import nn
 from torch import functional
 from torch._C import device
 from torch.nn.modules.pooling import MaxPool2d
-from Functions import SLinearFunction, SConv2dFunction, SMSEFunction, SCrossEntropyLossFunction, SBatchNorm2dFunction
+from Functions import SLinearFunction, SConv2dFunction, SMSEFunction, SCrossEntropyLossFunction, SBatchNorm2dFunction, TimesFunction
 import numpy as np
 
 class SModule(nn.Module):
@@ -54,7 +54,8 @@ class SModule(nn.Module):
         if method == "subtract":
             return self.weightS.grad.data.abs() - alpha * self.weightS.grad.data.abs() * (self.op.weight.data ** 2)
         if method == "SM":
-            return self.weightS.grad.data.abs() * alpha - self.op.weight.data.abs()
+            # return self.weightS.grad.data.abs() * alpha - self.op.weight.data.abs()
+            return self.weightS.grad.data.abs() * self.op.weight.abs().max() * alpha - self.op.weight.data.abs()
         else:
             raise NotImplementedError(f"method {method} not supported")
     
@@ -136,6 +137,7 @@ class SLinear(SModule):
         self.op = nn.Linear(in_features, out_features, bias)
         self.create_helper()
         self.function = SLinearFunction.apply
+        self.times_function = TimesFunction.apply
     
     def copy_N(self):
         new = NLinear(self.op.in_features, self.op.out_features, False if self.op.bias is None else True)
@@ -146,7 +148,9 @@ class SLinear(SModule):
 
     def forward(self, xC):
         x, xS = xC
-        x, xS = self.function(x * self.scale, xS * self.scale, self.op.weight + self.noise, self.weightS)
+        # x, xS = self.function(x * self.scale, xS * self.scale, self.op.weight + self.noise, self.weightS)
+        x, xS = self.function(x, xS, self.op.weight + self.noise, self.weightS)
+        x, xS = self.times_function(x, xS, self.scale)
         if self.op.bias is not None:
             x += self.op.bias
         if self.op.bias is not None:
@@ -159,6 +163,7 @@ class SConv2d(SModule):
         self.op = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, dilation, groups, bias, padding_mode)
         self.create_helper()
         self.function = SConv2dFunction.apply
+        self.times_function = TimesFunction.apply
 
     def copy_N(self):
         new = NConv2d(self.op.in_channels, self.op.out_channels, self.op.kernel_size, self.op.stride, self.op.padding, self.op.dilation, self.op.groups, False if self.op.bias is None else True, self.op.padding_mode)
@@ -169,7 +174,9 @@ class SConv2d(SModule):
 
     def forward(self, xC):
         x, xS = xC
-        x, xS = self.function(x * self.scale, xS * self.scale, self.op.weight + self.noise, self.weightS, None, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
+        # x, xS = self.function(x * self.scale, xS * self.scale, self.op.weight + self.noise, self.weightS, None, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
+        x, xS = self.function(x, xS, self.op.weight + self.noise, self.weightS, None, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
+        x, xS = self.times_function(x, xS, self.scale)
         if self.op.bias is not None:
             x += self.op.bias.reshape(1,-1,1,1).expand_as(x)
         if self.op.bias is not None:
@@ -389,8 +396,9 @@ class SModel(nn.Module):
                     sail_list = sail
                 else:
                     sail_list = torch.cat([sail_list, sail])
-        # import time
-        # torch.save(sail_list, f"S_grad_{time.time()}.pt")
+        if method == "second":
+            import time
+            torch.save(sail_list, f"S_grad_{time.time()}.pt")
         th = torch.quantile(sail_list, 1-quantile)
         # print(th)
         return th

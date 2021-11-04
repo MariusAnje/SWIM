@@ -4,7 +4,9 @@ from torch import optim
 import torchvision.transforms as transforms
 import numpy as np
 from models import SCrossEntropyLoss, SMLP3, SMLP4, SLeNet, CIFAR, FakeSCrossEntropyLoss
+from qmodels import QSLeNet, QCIFAR
 import resnet
+import qresnet
 from modules import SModule
 from tqdm import tqdm
 import time
@@ -143,7 +145,7 @@ if __name__ == "__main__":
             help='device used')
     parser.add_argument('--verbose', action='store', type=str2bool, default=False,
             help='see training process')
-    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR", "Res18", "TIN"],
+    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR", "Res18", "TIN", "QLeNet", "QCIFAR", "QRes18", "QTIN"],
             help='model to use')
     parser.add_argument('--header', action='store',type=int, default=1,
             help='use which saved state dict')
@@ -164,7 +166,7 @@ if __name__ == "__main__":
 
     BS = 128
 
-    if args.model == "CIFAR" or args.model == "Res18":
+    if args.model == "CIFAR" or args.model == "Res18" or args.model == "QCIFAR" or args.model == "QRes18":
         normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
         transform = transforms.Compose(
         [transforms.ToTensor(),
@@ -181,7 +183,7 @@ if __name__ == "__main__":
         secondloader = torch.utils.data.DataLoader(trainset, batch_size=BS//args.div, shuffle=False, num_workers=4)
         testset = torchvision.datasets.CIFAR10(root='~/Private/data', train=False, download=False, transform=transform)
         testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=4)
-    elif args.model == "TIN":
+    elif args.model == "TIN" or args.model == "QTIN":
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])
         transform = transforms.Compose(
@@ -225,6 +227,16 @@ if __name__ == "__main__":
         model = resnet.resnet18(num_classes = 10)
     elif args.model == "TIN":
         model = resnet.resnet18(num_classes = 200)
+    elif args.model == "QLeNet":
+        model = QSLeNet()
+    elif args.model == "QCIFAR":
+        model = QCIFAR()
+    elif args.model == "QRes18":
+        model = qresnet.resnet18(num_classes = 10)
+    elif args.model == "QTIN":
+        model = qresnet.resnet18(num_classes = 200)
+    else:
+        NotImplementedError
 
     model.to(device)
     model.push_S_device()

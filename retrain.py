@@ -70,13 +70,15 @@ def NEachEval(dev_var, write_var):
             total += len(correction)
     return (correct/total).cpu().numpy()
 
-def NTrain(epochs, header, dev_var, write_var, verbose=False):
+def NTrain(epochs, header, dev_var, write_var, eval_gap, verbose=False):
     best_acc = 0.0
+    j = 0
     for i in range(epochs):
         model.train()
         running_loss = 0.
         # for images, labels in tqdm(trainloader):
         for images, labels in trainloader:
+            j += 1
             model.clear_noise()
             model.set_noise(dev_var, write_var)
             optimizer.zero_grad()
@@ -87,13 +89,17 @@ def NTrain(epochs, header, dev_var, write_var, verbose=False):
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
-        test_acc = NEachEval(dev_var, write_var)
-        if test_acc > best_acc:
-            best_acc = test_acc
-            torch.save(model.state_dict(), f"tmp_best_{header}.pt")
-        if verbose:
-            print(f"epoch: {i:-3d}, test acc: {test_acc:.4f}, loss: {running_loss / len(trainloader):.4f}")
-        scheduler.step()
+            if j % eval_gap == 0:
+                # test_acc = NEachEval(dev_var, dev_var)
+                # print(f"Iteration: {j:-5d}, test acc: {test_acc:.4f}")
+        # test_acc = NEachEval(dev_var, write_var)
+                fine_mask_acc_list = []
+                loader = range(args.noise_epoch)
+                for _ in loader:
+                    acc = NEval(args.dev_var, args.write_var)
+                    fine_mask_acc_list.append(acc)
+                print(f"Iteration: {j:-5d}, average: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
+            scheduler.step()
 
 def RecoverBN(epoch):
     model.train()
@@ -115,17 +121,6 @@ def GetSecond():
         outputs, outputsS = model(images)
         loss = criteria(outputs, outputsS,labels)
         loss.backward()
-        # sail_list = None
-        # for m in model.modules():
-        #     if isinstance(m, SModule):
-        #         sail = m.mask_indicator("second", 0).view(-1)
-        #         if sail_list is None:
-        #             sail_list = sail
-        #         else:
-        #             sail_list = torch.cat([sail_list, sail])
-        # import time
-        # torch.save(sail_list, f"S_grad_{time.time()}.pt")
-        # exit()
 
 def str2bool(a):
     if a == "True":
@@ -174,6 +169,8 @@ if __name__ == "__main__":
             help='if calculated S grad if not necessary')
     parser.add_argument('--div', action='store', type=int, default=1,
             help='division points for second')
+    parser.add_argument('--eval_gap', action='store', type=int, default=100,
+            help='gap for evaluation')
     args = parser.parse_args()
 
     print(args)
@@ -270,88 +267,39 @@ if __name__ == "__main__":
     if "TIN" in args.model or "Res" in args.model:
         optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.train_epoch)
-    else:
-        optimizer = optim.Adam(model.parameters(), lr=1e-3)
-        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [60])
 
-    if not args.pretrained:
-        model.to_first_only()
-        NTrain(args.train_epoch, header, args.train_var, 0.0, args.verbose)
-        state_dict = torch.load(f"tmp_best_{header}.pt")
-        model.load_state_dict(state_dict)
-        model.from_first_back_second()
-        torch.save(model.state_dict(), f"saved_B_{header}.pt")
-        state_dict = torch.load(f"saved_B_{header}.pt")
-        print(f"No mask no noise: {CEval():.4f}")
-        model.load_state_dict(state_dict)
-        model.clear_mask()
-
-        no_mask_acc_list = []
-        loader = range(args.noise_epoch)
-        for _ in loader:
-            acc = NEval(args.dev_var, 0.0)
-            no_mask_acc_list.append(acc)
-        print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
-        torch.save(no_mask_acc_list, f"no_mask_list_{header}_{args.dev_var}.pt")
-
-        no_mask_acc_list = []
-        loader = range(args.noise_epoch)
-        for _ in loader:
-            acc = NEval(args.write_var, 0.0)
-            no_mask_acc_list.append(acc)
-        print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
-        torch.save(no_mask_acc_list, f"no_mask_list_{header}_{args.write_var}.pt")
-
-        exit()
-    else:
-        parent_path = args.model_path
-        header = args.header
-        try:
-            no_mask_acc_list = torch.load(os.path.join(parent_path, f"no_mask_list_{header}_{args.dev_var}.pt"))
-            print(f"[{args.dev_var}] No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
-        except:
-            print(f"[{args.dev_var}] Not Found")
-        try:
-            no_mask_acc_list = torch.load(os.path.join(parent_path, f"no_mask_list_{header}_{args.write_var}.pt"))
-            print(f"[{args.write_var}] No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
-        except:
-            print(f"[{args.write_var}] Not Found")
-        model.back_real(device)
-        model.push_S_device()
+    optimizer = optim.SGD(model.parameters(), lr=1e-4)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [60])
+    parent_path = args.model_path
+    header = args.header
+    try:
+        no_mask_acc_list = torch.load(os.path.join(parent_path, f"no_mask_list_{header}_{args.dev_var}.pt"))
+        print(f"[{args.dev_var}] No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
+    except:
+        print(f"[{args.dev_var}] Not Found")
+    try:
+        no_mask_acc_list = torch.load(os.path.join(parent_path, f"no_mask_list_{header}_{args.write_var}.pt"))
+        print(f"[{args.write_var}] No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
+    except:
+        print(f"[{args.write_var}] Not Found")
+    model.back_real(device)
+    model.push_S_device()
 
     
     state_dict = torch.load(os.path.join(parent_path, f"saved_B_{header}.pt"), map_location=device)
-    # model.to_first_only()
+    
     model.load_state_dict(state_dict)
-    # model.from_first_back_second()
+    
     model.back_real(device)
     model.push_S_device()
     criteria = SCrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.01)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
+    optimizer = optim.SGD(model.parameters(), lr=1e-4, momentum=0.9)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [1000])
     model.clear_noise()
 
-    model.normalize()
     print(f"No mask no noise: {CEval():.4f}")
-    GetSecond()
-    print(f"S grad before masking: {model.fetch_S_grad().item():E}")
-    if "Res18" in args.model or "TIN" in args.model:
-        model.fine_S_grad()
+    model.to_first_only()
+    NTrain(args.train_epoch, header, args.dev_var, args.dev_var, args.eval_gap, args.verbose)
     
-    if args.use_mask:
-        model.clear_mask()
-        mask_acc_list = []
-        th = model.calc_sail_th(args.mask_p, args.method, args.alpha)
-        model.set_mask_sail(th, "th", args.method, args.alpha)
-        print(th)
-        total, RM_new = model.get_mask_info()
-        print(f"Weights removed: {RM_new/total:f}")
-        model.de_normalize()
-        print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
-        fine_mask_acc_list = []
-        print(f"Finetune no noise: {CEval():.4f}")
-        loader = range(args.noise_epoch)
-        for _ in loader:
-            acc = NEval(args.dev_var, args.write_var)
-            fine_mask_acc_list.append(acc)
-        print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
+    # model.from_first_back_second()
+    

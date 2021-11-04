@@ -8,6 +8,23 @@ from tqdm.notebook import tqdm
 import numpy as np
 import torch.nn.functional as F
 
+class TimesFunction(autograd.Function):
+
+    # Note that both forward and backward are @staticmethods
+    @staticmethod
+    def forward(ctx, x, xS, a):
+        ctx.a = a
+        return x * a, torch.ones_like(x)
+
+    # This function has only a single output, so it gets only one gradient
+    @staticmethod
+    def backward(ctx, grad_output, grad_outputS):
+
+        grad_x = grad_output * ctx.a
+        grad_xS = grad_output * (ctx.a ** 2)
+
+        return grad_x, grad_xS, None
+
 
 class SLinearFunction(autograd.Function):
 
