@@ -8,6 +8,7 @@ from qmodels import QSLeNet, QCIFAR
 import resnet
 import qresnet
 import qvgg
+import qdensnet
 from modules import SModule
 from tqdm import tqdm
 import time
@@ -156,7 +157,7 @@ if __name__ == "__main__":
             help='device used')
     parser.add_argument('--verbose', action='store', type=str2bool, default=False,
             help='see training process')
-    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR", "Res18", "TIN", "QLeNet", "QCIFAR", "QRes18", "QTIN", "QVGG"],
+    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR", "Res18", "TIN", "QLeNet", "QCIFAR", "QRes18", "QDENSE", "QTIN", "QVGG"],
             help='model to use')
     parser.add_argument('--method', action='store', default="SM", choices=["second", "magnitude", "saliency", "random", "SM"],
             help='method used to calculate saliency')
@@ -187,7 +188,7 @@ if __name__ == "__main__":
 
     BS = 128
 
-    if args.model == "CIFAR" or args.model == "Res18" or args.model == "QCIFAR" or args.model == "QRes18":
+    if args.model == "CIFAR" or args.model == "Res18" or args.model == "QCIFAR" or args.model == "QRes18" or args.model == "QDENSE":
         normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
         transform = transforms.Compose(
         [transforms.ToTensor(),
@@ -254,6 +255,8 @@ if __name__ == "__main__":
         model = QCIFAR()
     elif args.model == "QRes18":
         model = qresnet.resnet18(num_classes = 10)
+    elif args.model == "QDENSE":
+        model = qdensnet.densenet121(num_classes = 10)
     elif args.model == "QTIN":
         model = qresnet.resnet18(num_classes = 200)
     elif args.model == "QVGG":

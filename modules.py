@@ -289,6 +289,15 @@ class SAdaptiveAvgPool2d(nn.Module):
         x, xS = xC
         return self.op(x), self.op(xS)
 
+class SAvgPool2d(nn.Module):
+    def __init__(self, kernel_size, stride=None, padding=0, ceil_mode=False, count_include_pad=True, divisor_override=None):
+        super().__init__()
+        self.op = nn.AvgPool2d(kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override)
+
+    def forward(self, xC):
+        x, xS = xC
+        return self.op(x), self.op(xS)
+
 class SBatchNorm2d(nn.Module):
     def __init__(self, num_features, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True):
         super().__init__()

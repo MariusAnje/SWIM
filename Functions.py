@@ -188,7 +188,10 @@ class QuantFunction(autograd.Function):
     @staticmethod
     def forward(ctx, N, input):
         det = input.abs().max() / pow(2, N)
-        return (input/det).round() * det
+        if det == 0:
+            return input
+        else:
+            return (input/det).round() * det
 
     @staticmethod
     def backward(ctx, grad_output):
