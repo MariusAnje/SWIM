@@ -70,10 +70,10 @@ def NEachEval(dev_var, write_var):
             total += len(correction)
     return (correct/total).cpu().numpy()
 
-def NTrain(epochs, header, dev_var, write_var, eval_gap, verbose=False):
+def NTrain(train_iter, header, dev_var, write_var, eval_gap, verbose=False):
     best_acc = 0.0
     j = 0
-    for i in range(epochs):
+    while True:
         model.train()
         running_loss = 0.
         # for images, labels in tqdm(trainloader):
@@ -100,6 +100,8 @@ def NTrain(epochs, header, dev_var, write_var, eval_gap, verbose=False):
                     fine_mask_acc_list.append(acc)
                 print(f"Iteration: {j:-5d}, average: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
             scheduler.step()
+            if j > train_iter * eval_gap:
+                return
 
 def RecoverBN(epoch):
     model.train()
@@ -133,7 +135,7 @@ def str2bool(a):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--train_epoch', action='store', type=int, default=20,
+    parser.add_argument('--train_iter', action='store', type=int, default=20,
             help='# of epochs of training')
     parser.add_argument('--noise_epoch', action='store', type=int, default=100,
             help='# of epochs of noise validations')
@@ -264,9 +266,9 @@ if __name__ == "__main__":
     # optimizer = optim.Adam(model.parameters(), lr=0.01)
     # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
 
-    if "TIN" in args.model or "Res" in args.model:
-        optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.train_epoch)
+    # if "TIN" in args.model or "Res" in args.model:
+    #     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
+    #     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.train_epoch)
 
     optimizer = optim.SGD(model.parameters(), lr=1e-4)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [60])
@@ -299,7 +301,7 @@ if __name__ == "__main__":
 
     print(f"No mask no noise: {CEval():.4f}")
     model.to_first_only()
-    NTrain(args.train_epoch, header, args.dev_var, args.dev_var, args.eval_gap, args.verbose)
+    NTrain(args.train_iter, header, args.dev_var, args.dev_var, args.eval_gap, args.verbose)
     
     # model.from_first_back_second()
     

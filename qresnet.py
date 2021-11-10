@@ -269,10 +269,6 @@ class ResNet(SModel):
     #                 if isinstance(sm, SModule):
     #                     sm.weightS.grad.data += sm.op.weight.grad.data * 2
 
-    def fine_S_grad(self):
-        for m in self.modules():
-            if isinstance(m, SModule):
-                m.weightS.grad.data += m.op.weight.grad.data * 2
 
 def _resnet(
     arch: str,

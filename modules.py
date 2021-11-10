@@ -42,7 +42,8 @@ class SModule(nn.Module):
         if method == "second":
             return self.weightS.grad.data.abs()
         if method == "magnitude":
-            return 1 / (self.op.weight.data.abs() + 1e-8)
+            # return 1 / (self.op.weight.data.abs() + 1e-8)
+            return self.op.weight.data.abs()
         if method == "saliency":
             if alpha is None:
                 alpha = 2
@@ -55,7 +56,7 @@ class SModule(nn.Module):
             return self.weightS.grad.data.abs() - alpha * self.weightS.grad.data.abs() * (self.op.weight.data ** 2)
         if method == "SM":
             # return self.weightS.grad.data.abs() * alpha - self.op.weight.data.abs()
-            return self.weightS.grad.data.abs() * self.op.weight.abs().max() * alpha - self.op.weight.data.abs()
+            return self.weightS.grad.data.abs() * self.op.weight.abs().max() * alpha + self.op.weight.data.abs()
         else:
             raise NotImplementedError(f"method {method} not supported")
     
@@ -530,6 +531,12 @@ class SModel(nn.Module):
                         mo.op.bias.data = mo.original_b
                         mo.original_b = None
     
+    def fine_S_grad(self):
+        for m in self.modules():
+            if isinstance(m, SModule):
+                m.weightS.grad.data += m.op.weight.grad.data * 2
+
+
     def back_real(self, device):
         for name, m in self.named_modules():
             if isinstance(m, FakeSModule):

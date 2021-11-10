@@ -7,6 +7,7 @@ from models import SCrossEntropyLoss, SMLP3, SMLP4, SLeNet, CIFAR, FakeSCrossEnt
 from qmodels import QSLeNet, QCIFAR
 import resnet
 import qresnet
+import qvgg
 from modules import SModule
 from tqdm import tqdm
 import time
@@ -78,7 +79,7 @@ def NTrain(epochs, header, dev_var, write_var, verbose=False):
         # for images, labels in tqdm(trainloader):
         for images, labels in trainloader:
             model.clear_noise()
-            model.set_noise(dev_var, write_var)
+            # model.set_noise(dev_var, write_var)
             optimizer.zero_grad()
             images, labels = images.to(device), labels.to(device)
             # images = images.view(-1, 784)
@@ -87,7 +88,8 @@ def NTrain(epochs, header, dev_var, write_var, verbose=False):
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
-        test_acc = NEachEval(dev_var, write_var)
+        # test_acc = NEachEval(dev_var, write_var)
+        test_acc = CEval()
         if test_acc > best_acc:
             best_acc = test_acc
             torch.save(model.state_dict(), f"tmp_best_{header}.pt")
@@ -154,7 +156,7 @@ if __name__ == "__main__":
             help='device used')
     parser.add_argument('--verbose', action='store', type=str2bool, default=False,
             help='see training process')
-    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR", "Res18", "TIN", "QLeNet", "QCIFAR", "QRes18", "QTIN"],
+    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR", "Res18", "TIN", "QLeNet", "QCIFAR", "QRes18", "QTIN", "QVGG"],
             help='model to use')
     parser.add_argument('--method', action='store', default="SM", choices=["second", "magnitude", "saliency", "random", "SM"],
             help='method used to calculate saliency')
@@ -202,7 +204,7 @@ if __name__ == "__main__":
         secondloader = torch.utils.data.DataLoader(trainset, batch_size=BS//args.div, shuffle=False, num_workers=4)
         testset = torchvision.datasets.CIFAR10(root='~/Private/data', train=False, download=False, transform=transform)
         testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=4)
-    elif args.model == "TIN" or args.model == "QTIN":
+    elif args.model == "TIN" or args.model == "QTIN" or args.model == "QVGG":
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])
         transform = transforms.Compose(
@@ -216,10 +218,10 @@ if __name__ == "__main__":
                 normalize,
                 ])
         trainset = torchvision.datasets.ImageFolder(root='~/Private/data/tiny-imagenet-200/train', transform=train_transform)
-        trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS, shuffle=True, num_workers=4)
-        secondloader = torch.utils.data.DataLoader(trainset, batch_size=BS//args.div, shuffle=False, num_workers=4)
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS, shuffle=True, num_workers=8)
+        secondloader = torch.utils.data.DataLoader(trainset, batch_size=BS//args.div, shuffle=False, num_workers=8)
         testset = torchvision.datasets.ImageFolder(root='~/Private/data/tiny-imagenet-200/val',  transform=transform)
-        testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=4)
+        testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=8)
     else:
         trainset = torchvision.datasets.MNIST(root='~/Private/data', train=True,
                                                 download=False, transform=transforms.ToTensor())
@@ -254,6 +256,8 @@ if __name__ == "__main__":
         model = qresnet.resnet18(num_classes = 10)
     elif args.model == "QTIN":
         model = qresnet.resnet18(num_classes = 200)
+    elif args.model == "QVGG":
+        model = qvgg.vgg11(num_classes = 200)
     else:
         NotImplementedError
 
@@ -267,8 +271,9 @@ if __name__ == "__main__":
     # optimizer = optim.Adam(model.parameters(), lr=0.01)
     # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
 
-    if "TIN" in args.model or "Res" in args.model:
-        optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
+    if "TIN" in args.model or "Res" in args.model or "VGG" in args.model:
+    # if "TIN" in args.model or "Res" in args.model:
+        optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.train_epoch)
     else:
         optimizer = optim.Adam(model.parameters(), lr=1e-3)
@@ -277,8 +282,9 @@ if __name__ == "__main__":
     if not args.pretrained:
         model.to_first_only()
         NTrain(args.train_epoch, header, args.train_var, 0.0, args.verbose)
-        state_dict = torch.load(f"tmp_best_{header}.pt")
-        model.load_state_dict(state_dict)
+        if args.train_var > 0:
+            state_dict = torch.load(f"tmp_best_{header}.pt")
+            model.load_state_dict(state_dict)
         model.from_first_back_second()
         torch.save(model.state_dict(), f"saved_B_{header}.pt")
         state_dict = torch.load(f"saved_B_{header}.pt")
@@ -335,8 +341,9 @@ if __name__ == "__main__":
     print(f"No mask no noise: {CEval():.4f}")
     GetSecond()
     print(f"S grad before masking: {model.fetch_S_grad().item():E}")
-    if "Res18" in args.model or "TIN" in args.model:
-        model.fine_S_grad()
+    # if "Res18" in args.model or "TIN" in args.model:
+    #     model.fine_S_grad()
+    model.fine_S_grad()
     
     if args.use_mask:
         model.clear_mask()
