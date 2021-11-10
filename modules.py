@@ -474,7 +474,7 @@ class SModel(nn.Module):
                 mo = father._modules[n[-1]]
                 new = mo.copy_N()
                 father._modules[n[-1]] = new
-            if isinstance(m, SReLU) or isinstance(m, SMaxpool2D) or isinstance(m, SBatchNorm2d) or isinstance(m, SAdaptiveAvgPool2d):
+            if isinstance(m, SReLU) or isinstance(m, SMaxpool2D) or isinstance(m, SBatchNorm2d) or isinstance(m, SAdaptiveAvgPool2d) or isinstance(m, SAvgPool2d):
                 n = n.split(".")
                 father = self
                 for i in range(len(n) - 1):
@@ -497,7 +497,7 @@ class SModel(nn.Module):
                 mo = father._modules[n[-1]]
                 new = mo.copy_S()
                 father._modules[n[-1]] = new
-            if isinstance(m, nn.ReLU) or isinstance(m, nn.MaxPool2d) or isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.AdaptiveAvgPool2d):
+            if isinstance(m, nn.ReLU) or isinstance(m, nn.MaxPool2d) or isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.AdaptiveAvgPool2d) or isinstance(m, nn.AvgPool2d):
                 n = n.split(".")
                 father = self
                 for i in range(len(n) - 1):
@@ -508,6 +508,9 @@ class SModel(nn.Module):
                     new = SMaxpool2D(m.kernel_size, m.stride, m.padding, m.dilation, True, m.ceil_mode)
                 elif isinstance(m, nn.AdaptiveAvgPool2d):
                     new = SAdaptiveAvgPool2d(m.output_size)
+                    new.op = m
+                elif isinstance(m, nn.AvgPool2d):
+                    new = SAvgPool2d(m.kernel_size, m.stride, m.padding, m.ceil_mode, m.count_include_pad, m.divisor_override)
                     new.op = m
                 elif isinstance(m, nn.BatchNorm2d):
                     new = SBatchNorm2d(m.num_features)
