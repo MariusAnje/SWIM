@@ -111,7 +111,7 @@ class _DenseLayer(SModel):
         return new_features
 
 
-class _DenseBlock(nn.ModuleDict):
+class _DenseBlock(SModel):
     _version = 2
 
     def __init__(
@@ -125,6 +125,7 @@ class _DenseBlock(nn.ModuleDict):
         memory_efficient: bool = False
     ) -> None:
         super(_DenseBlock, self).__init__()
+        self.num_layers = num_layers
         for i in range(num_layers):
             layer = _DenseLayer(
                 N,
@@ -138,8 +139,8 @@ class _DenseBlock(nn.ModuleDict):
 
     def forward(self, init_features: Tensor) -> Tensor:
         features = [init_features]
-        for name, layer in self.items():
-            new_features = layer(features)
+        for i in range(self.num_layers):
+            new_features = self._modules[f"denselayer{i+1}"](features)
             features.append(new_features)
         if isinstance(features[0], tuple):
             featuresS = [m[1] for m in features]
