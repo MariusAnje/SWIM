@@ -8,6 +8,23 @@ from tqdm.notebook import tqdm
 import numpy as np
 import torch.nn.functional as F
 
+class BackPool(autograd.Function):
+
+    # Note that both forward and backward are @staticmethods
+    @staticmethod
+    def forward(ctx, x, xS, a):
+        ctx.a = a
+        return x, xS
+
+    # This function has only a single output, so it gets only one gradient
+    @staticmethod
+    def backward(ctx, grad_output, grad_outputS):
+
+        grad_x = grad_output
+        grad_xS = grad_outputS * ctx.a
+
+        return grad_x, grad_xS, None
+
 class TimesFunction(autograd.Function):
 
     # Note that both forward and backward are @staticmethods

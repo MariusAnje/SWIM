@@ -4,6 +4,7 @@ from torch import optim
 import torchvision.transforms as transforms
 import numpy as np
 from models import SCrossEntropyLoss, SMLP3, SMLP4, SLeNet, CIFAR, FakeSCrossEntropyLoss
+import modules
 from qmodels import QSLeNet, QCIFAR
 import resnet
 import qresnet
@@ -177,6 +178,8 @@ if __name__ == "__main__":
             help='if calculated S grad if not necessary')
     parser.add_argument('--div', action='store', type=int, default=1,
             help='division points for second')
+    parser.add_argument('--layerwise', action='store',type=str2bool, default=False,
+            help='if do it layer by layer')
     args = parser.parse_args()
 
     print(args)
@@ -274,10 +277,11 @@ if __name__ == "__main__":
     # optimizer = optim.Adam(model.parameters(), lr=0.01)
     # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
 
-    if "TIN" in args.model or "Res" in args.model or "VGG" in args.model:
+    if "TIN" in args.model or "Res" in args.model or "VGG" in args.model or "DENSE" in args.model:
     # if "TIN" in args.model or "Res" in args.model:
         optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.train_epoch)
+        # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [1000])
     else:
         optimizer = optim.Adam(model.parameters(), lr=1e-3)
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [60])
@@ -354,6 +358,24 @@ if __name__ == "__main__":
         th = model.calc_sail_th(args.mask_p, args.method, args.alpha)
         model.set_mask_sail(th, "th", args.method, args.alpha)
         print(th)
+        # if not args.layerwise:
+        #     mask_acc_list = []
+        #     th = model.calc_sail_th(args.mask_p, args.method, args.alpha)
+        #     model.set_mask_sail(th, "th", args.method, args.alpha)
+        #     print(th)
+        # else:
+        #     layers = [model.conv1, model.fc]
+        #     for l in layers:
+        #         for m in l.modules():
+        #             if isinstance(m, SModule):
+        #                 m.mask = torch.zeros_like(m.weightS)
+        #     layers = [model.layer1, model.layer2, model.layer3, model.layer4]
+        #     for l in layers:
+        #         tmp = modules.SModel()
+        #         tmp.l = l
+        #         th = tmp.calc_sail_th(args.mask_p, args.method, args.alpha)
+        #         tmp.set_mask_sail(th, "th", args.method, args.alpha)
+
         total, RM_new = model.get_mask_info()
         print(f"Weights removed: {RM_new/total:f}")
         model.de_normalize()
