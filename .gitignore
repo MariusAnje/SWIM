@@ -141,6 +141,9 @@ cython_debug/
 *.pt
 *.o*
 *.svg
+*.ipynb
+*.pdf
+*.xlsx
 Train.job
 test_mask.ipynb
 
