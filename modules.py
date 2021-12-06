@@ -3,7 +3,8 @@ from torch import nn
 from torch import functional
 from torch._C import device
 from torch.nn.modules.pooling import MaxPool2d
-from Functions import SLinearFunction, SConv2dFunction, SMSEFunction, SCrossEntropyLossFunction, SBatchNorm2dFunction
+from Functions import SLinearFunction, SConv2dFunction, SMSEFunction, SCrossEntropyLossFunction, SBatchNorm2dFunction, TimesFunction
+import numpy as np
 
 class SModule(nn.Module):
     def __init__(self):
@@ -16,18 +17,35 @@ class SModule(nn.Module):
         self.original_w = None
         self.original_b = None
         self.scale = 1.0
-
-    # def set_noise(self, var):
-        # self.noise = torch.normal(mean=0., std=var, size=self.noise.size()).to(self.op.weight.device) 
     
-    def set_noise(self, var, N, m):
+    def set_noise(self, dev_var, write_var, N, m):
         # N: number of bits per weight, m: number of bits per device
-        if var != 0:
-            noise = torch.zeros_like(self.noise).to(self.op.weight.device)
-            scale = self.op.weight.abs().max()
-            for i in range(1, N//m + 1):
-                noise += (torch.normal(mean=0., std=var, size=self.noise.size()) * (pow(2, - i*m))).to(self.op.weight.device)
-            self.noise = noise.to(self.op.weight.device) * scale
+        # Dev_var: device variation before write and verify
+        # write_var: device variation after write and verity
+        scale = self.op.weight.abs().max()
+        noise_dev = torch.zeros_like(self.noise).to(self.op.weight.device)
+        noise_write = torch.zeros_like(self.noise).to(self.op.weight.device)
+        for i in range(1, N//m + 1):
+            if dev_var != 0:
+                noise_dev   += (torch.normal(mean=0., std=dev_var, size=self.noise.size()) * (pow(2, - i*m))).to(self.op.weight.device)
+            if write_var != 0:
+                noise_write += (torch.normal(mean=0., std=write_var, size=self.noise.size()) * (pow(2, - i*m))).to(self.op.weight.device)
+        noise_dev = noise_dev.to(self.op.weight.device) * scale
+        noise_write = noise_write.to(self.op.weight.device) * scale
+
+        self.noise = noise_dev * self.mask + noise_write * (1 - self.mask)
+    
+    def set_add(self, dev_var, write_var, N, m):
+        # N: number of bits per weight, m: number of bits per device
+        # Dev_var: device variation before write and verify
+        # write_var: device variation after write and verity
+        scale = self.op.weight.abs().max()
+        noise_dev = torch.ones_like(self.noise).to(self.op.weight.device) * dev_var
+        noise_write = torch.ones_like(self.noise).to(self.op.weight.device) * write_var
+        noise_dev = noise_dev.to(self.op.weight.device) * scale
+        noise_write = noise_write.to(self.op.weight.device) * scale
+
+        self.noise = noise_dev * self.mask + noise_write * (1 - self.mask)
     
     def clear_noise(self):
         self.noise = torch.zeros_like(self.op.weight)
@@ -36,7 +54,8 @@ class SModule(nn.Module):
         if method == "second":
             return self.weightS.grad.data.abs()
         if method == "magnitude":
-            return 1 / (self.op.weight.data.abs() + 1e-8)
+            # return 1 / (self.op.weight.data.abs() + 1e-8)
+            return self.op.weight.data.abs()
         if method == "saliency":
             if alpha is None:
                 alpha = 2
@@ -47,6 +66,9 @@ class SModule(nn.Module):
             return self.weightS.grad.abs() * self.op.weight.abs().max() / (self.op.weight.data ** alpha + 1e-8).abs()
         if method == "subtract":
             return self.weightS.grad.data.abs() - alpha * self.weightS.grad.data.abs() * (self.op.weight.data ** 2)
+        if method == "SM":
+            # return self.weightS.grad.data.abs() * alpha - self.op.weight.data.abs()
+            return self.weightS.grad.data.abs() * self.op.weight.abs().max() * alpha + self.op.weight.data.abs()
         else:
             raise NotImplementedError(f"method {method} not supported")
     
@@ -75,15 +97,19 @@ class SModule(nn.Module):
             raise NotImplementedError(f"Mode: {mode} not supported, only support mode portion & th, ")
     
     def set_mask_sail(self, portion, mode, method, alpha=None):
-        saliency = self.mask_indicator(method, alpha)
-        if mode == "portion":
-            th = saliency.view(-1).quantile(1-portion)
-            mask = (saliency <= th).to(torch.float)
-        elif mode == "th":
-            mask = (saliency <= portion).to(torch.float)
+        if mode == "random":
+            size = len(self.mask.view(-1))
+            self.mask = torch.Tensor(np.random.binomial(1,1-portion,size)).to(self.mask.dtype).to(self.mask.device).view(self.mask.shape)
         else:
-            raise NotImplementedError(f"Mode: {mode} not supported, only support mode portion & th, ")
-        self.mask = self.mask * mask
+            saliency = self.mask_indicator(method, alpha)
+            if mode == "portion":
+                th = saliency.view(-1).quantile(1-portion)
+                mask = (saliency <= th).to(torch.float)
+            elif mode == "th":
+                mask = (saliency <= portion).to(torch.float)                
+            else:
+                raise NotImplementedError(f"Mode: {mode} not supported, only support mode portion & th, ")
+            self.mask = self.mask * mask
     
     def clear_mask(self):
         self.mask = torch.ones_like(self.op.weight)
@@ -115,15 +141,8 @@ class SModule(nn.Module):
         scale = self.op.weight.data.abs().max().item()
         self.scale = scale
         self.op.weight.data = self.op.weight.data / scale
-        if self.op.bias is not None:
-            self.op.bias.data = self.op.bias.data / scale
-
-class nn2S(nn.Module):
-    def __init__(self):
-        super().__init__()
-    
-    def forward(self, x):
-        return x, torch.ones_like(x)
+        # if self.op.bias is not None:
+        #     self.op.bias.data = self.op.bias.data / scale
 
 class SLinear(SModule):
     def __init__(self, in_features, out_features, bias=True):
@@ -131,6 +150,7 @@ class SLinear(SModule):
         self.op = nn.Linear(in_features, out_features, bias)
         self.create_helper()
         self.function = SLinearFunction.apply
+        self.times_function = TimesFunction.apply
     
     def copy_N(self):
         new = NLinear(self.op.in_features, self.op.out_features, False if self.op.bias is None else True)
@@ -141,9 +161,13 @@ class SLinear(SModule):
 
     def forward(self, xC):
         x, xS = xC
-        x, xS = self.function(x, xS, (self.op.weight + self.noise) * self.mask, self.weightS)
+        # x, xS = self.function(x * self.scale, xS * self.scale, self.op.weight + self.noise, self.weightS)
+        x, xS = self.function(x, xS, self.op.weight + self.noise, self.weightS)
+        x, xS = self.times_function(x, xS, self.scale)
         if self.op.bias is not None:
             x += self.op.bias
+        if self.op.bias is not None:
+            xS += self.op.bias
         return x, xS
 
 class SConv2d(SModule):
@@ -152,6 +176,7 @@ class SConv2d(SModule):
         self.op = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, dilation, groups, bias, padding_mode)
         self.create_helper()
         self.function = SConv2dFunction.apply
+        self.times_function = TimesFunction.apply
 
     def copy_N(self):
         new = NConv2d(self.op.in_channels, self.op.out_channels, self.op.kernel_size, self.op.stride, self.op.padding, self.op.dilation, self.op.groups, False if self.op.bias is None else True, self.op.padding_mode)
@@ -162,29 +187,39 @@ class SConv2d(SModule):
 
     def forward(self, xC):
         x, xS = xC
-        # print(x.device)
-        # print(xS.device)
-        # print(self.mask.device)
-        # print(self.weightS.device)
-        # print(self.op.weight.device)
-        x, xS = self.function(x, xS, (self.op.weight + self.noise) * self.mask, self.weightS, None, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
+        # x, xS = self.function(x * self.scale, xS * self.scale, self.op.weight + self.noise, self.weightS, None, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
+        x, xS = self.function(x, xS, self.op.weight + self.noise, self.weightS, None, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
+        x, xS = self.times_function(x, xS, self.scale)
         if self.op.bias is not None:
             x += self.op.bias.reshape(1,-1,1,1).expand_as(x)
+        if self.op.bias is not None:
+            xS += self.op.bias.reshape(1,-1,1,1).expand_as(xS)
         return x, xS
 
 class NModule(nn.Module):
-    # def set_noise(self, var):
-    #     self.noise = torch.normal(mean=0., std=var, size=self.noise.size()).to(self.op.weight.device) 
-    def set_noise(self, var, N, m):
-        if var != 0:
-            noise = torch.zeros_like(self.noise)
-            scale = self.op.weight.abs().max()
-            for i in range(1, N//m + 1):
-                noise += torch.normal(mean=0., std=var, size=self.noise.size(), device=noise.device) * (pow(2, - i*m))
-            self.noise = noise.to(self.op.weight.device) * scale
+    def set_noise(self, dev_var, write_var, N, m):
+        # N: number of bits per weight, m: number of bits per device
+        # Dev_var: device variation before write and verify
+        # write_var: device variation after write and verity
+        scale = self.op.weight.abs().max()
+        noise_dev = torch.zeros_like(self.noise).to(self.op.weight.device)
+        noise_write = torch.zeros_like(self.noise).to(self.op.weight.device)
+        for i in range(1, N//m + 1):
+            if dev_var != 0:
+                noise_dev   += (torch.normal(mean=0., std=dev_var, size=self.noise.size()) * (pow(2, - i*m))).to(self.op.weight.device)
+            if write_var != 0:
+                noise_write += (torch.normal(mean=0., std=write_var, size=self.noise.size()) * (pow(2, - i*m))).to(self.op.weight.device)
+        noise_dev = noise_dev.to(self.op.weight.device) * scale
+        noise_write = noise_write.to(self.op.weight.device) * scale
+
+        self.noise = noise_dev * self.mask + noise_write * (1 - self.mask)
     
     def clear_noise(self):
         self.noise = torch.zeros_like(self.op.weight)
+    
+    def push_S_device(self):
+        self.mask = self.mask.to(self.op.weight.device)
+        self.noise = self.noise.to(self.op.weight.device)
 
 class NLinear(NModule):
     def __init__(self, in_features, out_features, bias=True):
@@ -202,7 +237,7 @@ class NLinear(NModule):
         return new
 
     def forward(self, x):
-        x = self.function(x, (self.op.weight + self.noise) * self.mask, self.op.bias)
+        x = self.function(x, self.op.weight + self.noise, self.op.bias)
         return x
 
 class NConv2d(NModule):
@@ -221,7 +256,7 @@ class NConv2d(NModule):
         return new
 
     def forward(self, x):
-        x = self.function(x, (self.op.weight + self.noise) * self.mask, self.op.bias, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
+        x = self.function(x, self.op.weight + self.noise, self.op.bias, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
         return x
 
 class SReLU(nn.Module):
@@ -266,6 +301,15 @@ class SAdaptiveAvgPool2d(nn.Module):
         x, xS = xC
         return self.op(x), self.op(xS)
 
+class SAvgPool2d(nn.Module):
+    def __init__(self, kernel_size, stride=None, padding=0, ceil_mode=False, count_include_pad=True, divisor_override=None):
+        super().__init__()
+        self.op = nn.AvgPool2d(kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override)
+
+    def forward(self, xC):
+        x, xS = xC
+        return self.op(x), self.op(xS)
+
 class SBatchNorm2d(nn.Module):
     def __init__(self, num_features, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True):
         super().__init__()
@@ -293,16 +337,26 @@ class NModel(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def set_noise(self, var, N=8, m=1):
+    def set_noise(self, dev_var, write_var, N=8, m=1):
         for mo in self.modules():
             if isinstance(mo, NModule):
-                # m.set_noise(var)
-                mo.set_noise(var, N, m)
-    
+                mo.set_noise(dev_var, write_var, N, m)
+   
+    def set_add(self, dev_var, write_var, N=8, m=1):
+        for mo in self.modules():
+            if isinstance(mo, NModule):
+                mo.set_add(dev_var, write_var, N, m) 
+
     def clear_noise(self):
         for m in self.modules():
             if isinstance(m, NModule):
                 m.clear_noise()
+    
+    def push_S_device(self):
+        for m in self.modules():
+            if isinstance(m, NModule):
+            # if isinstance(m, NLinear) or isinstance(m, NConv2d):
+                m.push_S_device()
 
 class SModel(nn.Module):
     def __init__(self):
@@ -328,30 +382,30 @@ class SModel(nn.Module):
 
     def push_S_device(self):
         for m in self.modules():
-            if isinstance(m, SLinear) or isinstance(m, SConv2d):
+            if isinstance(m, SModule):
                 m.push_S_device()
 
     def clear_S_grad(self):
         for m in self.modules():
-            if isinstance(m, SLinear) or isinstance(m, SConv2d):
+            if isinstance(m, SModule):
                 m.clear_S_grad()
 
     def do_second(self):
         for m in self.modules():
-            if isinstance(m, SLinear) or isinstance(m, SConv2d):
+            if isinstance(m, SModule):
                 m.do_second()
 
     def fetch_S_grad(self):
         S_grad_sum = 0
         for m in self.modules():
-            if isinstance(m, SLinear) or isinstance(m, SConv2d):
+            if isinstance(m, SModule):
                 S_grad_sum += m.fetch_S_grad()
         return S_grad_sum
     
     def calc_S_grad_th(self, quantile):
         S_grad_list = None
         for m in self.modules():
-            if isinstance(m, SLinear) or isinstance(m, SConv2d):
+            if isinstance(m, SModule):
                 if S_grad_list is None:
                     S_grad_list = m.fetch_S_grad_list().view(-1)
                 else:
@@ -363,32 +417,39 @@ class SModel(nn.Module):
     def calc_sail_th(self, quantile, method, alpha=None):
         sail_list = None
         for m in self.modules():
-            if isinstance(m, SLinear) or isinstance(m, SConv2d):
+            if isinstance(m, SModule):
                 sail = m.mask_indicator(method, alpha).view(-1)
                 if sail_list is None:
                     sail_list = sail
                 else:
                     sail_list = torch.cat([sail_list, sail])
+        if method == "second":
+            import time
+            torch.save(sail_list, f"S_grad_{time.time()}.pt")
         th = torch.quantile(sail_list, 1-quantile)
         # print(th)
         return th
 
-    def set_noise(self, var, N=8, m=1):
+    def set_noise(self, dev_var, write_var, N=8, m=1):
         for mo in self.modules():
-            if isinstance(mo, SLinear) or isinstance(mo, SConv2d) or isinstance(mo, NModule):
-                # m.set_noise(var)
-                mo.set_noise(var, N, m)
+            if isinstance(mo, SModule) or isinstance(mo, NModule):
+                mo.set_noise(dev_var, write_var, N, m)
     
+    def set_add(self, dev_var, write_var, N=8, m=1):
+        for mo in self.modules():
+            if isinstance(mo, SModule) or isinstance(mo, NModule):
+                mo.set_add(dev_var, write_var, N, m)    
+
     def clear_noise(self):
         for m in self.modules():
-            if isinstance(m, SLinear) or isinstance(m, SConv2d):
+            if isinstance(m, SModule):
                 m.clear_noise()
     
     def get_mask_info(self):
         total = 0
         RM = 0
         for m in self.modules():
-            if isinstance(m, SLinear) or isinstance(m, SConv2d):
+            if isinstance(m, SModule):
                 t, r = m.get_mask_info()
                 total += t
                 RM += r
@@ -396,33 +457,36 @@ class SModel(nn.Module):
 
     def set_mask(self, th, mode):
         for m in self.modules():
-            if isinstance(m, SLinear) or isinstance(m, SConv2d):
+            if isinstance(m, SModule):
                 m.set_mask(th, mode)
     
     def set_mask_mag(self, th, mode):
         for m in self.modules():
-            if isinstance(m, SLinear) or isinstance(m, SConv2d):
+            if isinstance(m, SModule):
                 m.set_mask_mag(th, mode)
     
     def set_mask_sail(self, th, mode, method, alpha=None):
         for m in self.modules():
-            if isinstance(m, SLinear) or isinstance(m, SConv2d):
+            if isinstance(m, SModule):
                 m.set_mask_sail(th, mode, method, alpha)
     
     def clear_mask(self):
         for m in self.modules():
-            if isinstance(m, SLinear) or isinstance(m, SConv2d):
+            if isinstance(m, SModule):
                 m.clear_mask()
     
     def to_fake(self, device):
         for name, m in self.named_modules():
-            if isinstance(m, SLinear) or isinstance(m, SConv2d) or isinstance(m, SMaxpool2D) or isinstance(m, SReLU):
+            if isinstance(m, SModule) or isinstance(m, SMaxpool2D) or isinstance(m, SReLU):
                 new = FakeSModule(m.op)
                 self._modules[name] = new
         self.to(device)
     
     def to_first_only(self):
         self.first_only = True
+        for m in self.modules():
+            if isinstance(m, SModel):
+                m.first_only = True
         for n, m in self.named_modules():
             if isinstance(m, SModule):
                 n = n.split(".")
@@ -432,7 +496,7 @@ class SModel(nn.Module):
                 mo = father._modules[n[-1]]
                 new = mo.copy_N()
                 father._modules[n[-1]] = new
-            if isinstance(m, SReLU) or isinstance(m, SMaxpool2D) or isinstance(m, SBatchNorm2d) or isinstance(m, SAdaptiveAvgPool2d):
+            if isinstance(m, SReLU) or isinstance(m, SMaxpool2D) or isinstance(m, SBatchNorm2d) or isinstance(m, SAdaptiveAvgPool2d) or isinstance(m, SAvgPool2d):
                 n = n.split(".")
                 father = self
                 for i in range(len(n) - 1):
@@ -443,6 +507,9 @@ class SModel(nn.Module):
 
     def from_first_back_second(self):
         self.first_only = False
+        for m in self.modules():
+            if isinstance(m, SModel):
+                m.first_only = False
         for n, m in self.named_modules():
             if isinstance(m, NModule):
                 n = n.split(".")
@@ -452,7 +519,7 @@ class SModel(nn.Module):
                 mo = father._modules[n[-1]]
                 new = mo.copy_S()
                 father._modules[n[-1]] = new
-            if isinstance(m, nn.ReLU) or isinstance(m, nn.MaxPool2d) or isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.AdaptiveAvgPool2d):
+            if isinstance(m, nn.ReLU) or isinstance(m, nn.MaxPool2d) or isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.AdaptiveAvgPool2d) or isinstance(m, nn.AvgPool2d):
                 n = n.split(".")
                 father = self
                 for i in range(len(n) - 1):
@@ -461,24 +528,35 @@ class SModel(nn.Module):
                     new = SReLU(m.inplace)
                 elif isinstance(m, nn.MaxPool2d):
                     new = SMaxpool2D(m.kernel_size, m.stride, m.padding, m.dilation, True, m.ceil_mode)
+                elif isinstance(m, nn.AdaptiveAvgPool2d):
+                    new = SAdaptiveAvgPool2d(m.output_size)
+                    new.op = m
+                elif isinstance(m, nn.AvgPool2d):
+                    new = SAvgPool2d(m.kernel_size, m.stride, m.padding, m.ceil_mode, m.count_include_pad, m.divisor_override)
+                    new.op = m
+                elif isinstance(m, nn.BatchNorm2d):
+                    new = SBatchNorm2d(m.num_features)
+                    new.op = m
                 # TODO: Other modules specified above
                 father._modules[n[-1]] = new
 
     def normalize(self):
         for mo in self.modules():
-            if isinstance(mo, SLinear) or isinstance(mo, SConv2d):
+            # if isinstance(mo, SLinear) or isinstance(mo, SConv2d):
+            if isinstance(mo, SModule):
                 mo.normalize()
 
     def get_scale(self):
         scale = 1.0
         for m in self.modules():
-            if isinstance(m, SLinear) or isinstance(m, SConv2d):
+            if isinstance(m, SModule):
                 scale *= m.scale
         return scale
 
     def de_normalize(self):
         for mo in self.modules():
-            if isinstance(mo, SLinear) or isinstance(mo, SConv2d):
+            # if isinstance(mo, SLinear) or isinstance(mo, SConv2d):
+            if isinstance(mo, SModule):
                 if mo.original_w is None:
                     raise Exception("no original weight")
                 else:
@@ -489,6 +567,12 @@ class SModel(nn.Module):
                         mo.op.bias.data = mo.original_b
                         mo.original_b = None
     
+    def fine_S_grad(self):
+        for m in self.modules():
+            if isinstance(m, SModule):
+                m.weightS.grad.data += m.op.weight.grad.data * 2
+
+
     def back_real(self, device):
         for name, m in self.named_modules():
             if isinstance(m, FakeSModule):

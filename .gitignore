@@ -147,8 +147,11 @@ cython_debug/
 Train.job
 test_mask.ipynb
 
+# MacOS
 *.DS_Store*
 .vscode/
+
+# Work books
 load_fake.ipynb
 save_model.ipynb
 test_normal.ipynb

@@ -131,53 +131,6 @@ class SLeNet(SModel):
             num_features *= s
         return num_features
 
-class FLeNet(SModel):
-
-    def __init__(self):
-        super().__init__()
-        # 1 input image channel, 6 output channels, 3x3 square convolution
-        # kernel
-        self.conv1 = nn.Conv2d(1, 6, 3, padding=1)
-        self.conv2 = nn.Conv2d(6, 16, 3, padding=1)
-        # an affine operation: y = Wx + b
-        self.fc1 = SLinear(16 * 7 * 7, 120)  # 6*6 from image dimension
-        self.fc2 = SLinear(120, 84)
-        self.fc3 = SLinear(84, 10)
-        self.pool = nn.MaxPool2d(2)
-        self.srelu = SReLU()
-        self.relu = nn.ReLU()
-        self.trans = nn2S()
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.relu(x)
-        x = self.pool(x)
-        
-        x = self.conv2(x)
-        x = self.relu(x)
-        x = self.pool(x)
-        
-        if not self.first_only:
-            xS = torch.ones_like(x)
-            x = (x, xS)
-        x = self.unpack_flattern(x)
-        
-        x = self.fc1(x)
-        x = self.srelu(x)
-        
-        x = self.fc2(x)
-        x = self.srelu(x)
-        
-        x = self.fc3(x)
-        return x
-
-    def num_flat_features(self, x):
-        size = x.size()[1:]  # all dimensions except the batch dimension
-        num_features = 1
-        for s in size:
-            num_features *= s
-        return num_features
-
 class CIFAR(SModel):
     def __init__(self):
         super().__init__()

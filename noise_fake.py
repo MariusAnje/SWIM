@@ -4,6 +4,7 @@ from torch import optim
 import torchvision.transforms as transforms
 import numpy as np
 from models import FakeCIFAR, SCrossEntropyLoss, SMLP3, SMLP4, SLeNet, CIFAR, FakeSCrossEntropyLoss
+import resnetN
 from modules import SModule
 from tqdm import tqdm
 import time
@@ -11,6 +12,7 @@ import argparse
 import os
 
 def CEval():
+    model.eval()
     total = 0
     correct = 0
     model.clear_noise()
@@ -26,6 +28,7 @@ def CEval():
     return (correct/total).cpu().numpy()
 
 def NEval(var):
+    model.eval()
     total = 0
     correct = 0
     model.clear_noise()
@@ -42,6 +45,7 @@ def NEval(var):
     return (correct/total).cpu().numpy()
 
 def NEachEval(var):
+    model.eval()
     total = 0
     correct = 0
     model.clear_noise()
@@ -61,7 +65,9 @@ def NEachEval(var):
 def NTrain(epochs, header, var, verbose=False):
     best_acc = 0.0
     for i in range(epochs):
+        model.train()
         running_loss = 0.
+        # for images, labels in tqdm(trainloader):
         for images, labels in trainloader:
             model.clear_noise()
             model.set_noise(var)
@@ -82,6 +88,7 @@ def NTrain(epochs, header, var, verbose=False):
         scheduler.step()
 
 def GetSecond():
+    model.eval()
     model.clear_noise()
     optimizer.zero_grad()
     for images, labels in trainloader:
@@ -104,34 +111,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--train_epoch', action='store', type=int, default=20,
             help='# of epochs of training')
-    parser.add_argument('--fine_epoch', action='store', type=int, default=20,
-            help='# of epochs of finetuning')
     parser.add_argument('--noise_epoch', action='store', type=int, default=100,
             help='# of epochs of noise validations')
     parser.add_argument('--noise_var', action='store', type=float, default=0.1,
             help='noise variation')
-    parser.add_argument('--mask_p', action='store', type=float, default=0.01,
-            help='portion of the mask')
     parser.add_argument('--device', action='store', default="cuda:0",
             help='device used')
     parser.add_argument('--verbose', action='store', type=str2bool, default=False,
             help='see training process')
-    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR"],
+    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR", "Res18", "TIN"],
             help='model to use')
-    parser.add_argument('--method', action='store', default="second", choices=["second", "magnitude", "saliency", "r_saliency", "subtract"],
-            help='method used to calculate saliency')
-    parser.add_argument('--alpha', action='store', type=float, default=1.0,
-            help='weight used in saliency - substract')
-    parser.add_argument('--header', action='store',type=int, default=1,
-            help='use which saved state dict')
-    parser.add_argument('--pretrained', action='store',type=str2bool, default=True,
-            help='if to use pretrained model')
-    parser.add_argument('--use_mask', action='store',type=str2bool, default=True,
-            help='if to do the masking experiment')
-    parser.add_argument('--model_path', action='store', default="./pretrained",
-            help='where you put the pretrained model')
-    parser.add_argument('--save_file', action='store',type=str2bool, default=True,
-            help='if to save the files')
     args = parser.parse_args()
 
     print(args)
@@ -141,19 +130,9 @@ if __name__ == "__main__":
     
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
 
-    BS = 128
+    BS = 64
 
-    if args.model != "CIFAR":
-        trainset = torchvision.datasets.MNIST(root='~/Private/data', train=True,
-                                                download=False, transform=transforms.ToTensor())
-        trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS,
-                                                shuffle=True, num_workers=2)
-
-        testset = torchvision.datasets.MNIST(root='~/Private/data', train=False,
-                                            download=False, transform=transforms.ToTensor())
-        testloader = torch.utils.data.DataLoader(testset, batch_size=BS,
-                                                    shuffle=False, num_workers=2)
-    else:
+    if args.model == "CIFAR" or args.model == "Res18":
         normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
         transform = transforms.Compose(
         [transforms.ToTensor(),
@@ -169,6 +148,33 @@ if __name__ == "__main__":
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS, shuffle=True, num_workers=4)
         testset = torchvision.datasets.CIFAR10(root='~/Private/data', train=False, download=False, transform=transform)
         testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=4)
+    elif args.model == "TIN":
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225])
+        transform = transforms.Compose(
+                [transforms.ToTensor(),
+                 normalize,
+                ])
+        train_transform = transforms.Compose([
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomCrop(64, 4),
+                transforms.ToTensor(),
+                normalize,
+                ])
+        trainset = torchvision.datasets.ImageFolder(root='~/Private/data/tiny-imagenet-200/train', transform=train_transform)
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS, shuffle=True, num_workers=4)
+        testset = torchvision.datasets.ImageFolder(root='~/Private/data/tiny-imagenet-200/val',  transform=transform)
+        testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=4)
+    else:
+        trainset = torchvision.datasets.MNIST(root='~/Private/data', train=True,
+                                                download=False, transform=transforms.ToTensor())
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS,
+                                                shuffle=True, num_workers=2)
+
+        testset = torchvision.datasets.MNIST(root='~/Private/data', train=False,
+                                            download=False, transform=transforms.ToTensor())
+        testloader = torch.utils.data.DataLoader(testset, batch_size=BS,
+                                                    shuffle=False, num_workers=2)
 
 
     if args.model == "MLP3":
@@ -179,8 +185,13 @@ if __name__ == "__main__":
         model = SLeNet()
     elif args.model == "CIFAR":
         model = FakeCIFAR()
+    elif args.model == "Res18":
+        model = resnetN.resnet18(num_classes = 10)
+    elif args.model == "TIN":
+        model = resnetN.resnet101(num_classes = 200)
 
     model.to(device)
+    model.push_S_device()
     model.clear_noise()
     model.push_S_device()
     criteria = torch.nn.CrossEntropyLoss()
@@ -188,8 +199,11 @@ if __name__ == "__main__":
     # optimizer = optim.Adam(model.parameters(), lr=0.01)
     # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
 
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [60])
+    # optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [60])
+
+    optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.train_epoch)
 
     NTrain(args.train_epoch, header, args.noise_var, args.verbose)
     state_dict = torch.load(f"tmp_best_{header}.pt")

@@ -4,7 +4,12 @@ from torch import optim
 import torchvision.transforms as transforms
 import numpy as np
 from models import SCrossEntropyLoss, SMLP3, SMLP4, SLeNet, CIFAR, FakeSCrossEntropyLoss
+import modules
+from qmodels import QSLeNet, QCIFAR
 import resnet
+import qresnet
+import qvgg
+import qdensnet
 from modules import SModule
 from tqdm import tqdm
 import time
@@ -29,13 +34,13 @@ def CEval():
             total += len(correction)
     return (correct/total).cpu().numpy()
 
-def NEval(var):
+def NEval(dev_var, write_var):
     model.eval()
     total = 0
     correct = 0
     model.clear_noise()
     with torch.no_grad():
-        model.set_noise(var)
+        model.set_noise(dev_var, write_var)
         for images, labels in testloader:
             images, labels = images.to(device), labels.to(device)
             # images = images.view(-1, 784)
@@ -48,15 +53,35 @@ def NEval(var):
             total += len(correction)
     return (correct/total).cpu().numpy()
 
-def NEachEval(var):
+def AEval(dev_var, write_var):
     model.eval()
     total = 0
     correct = 0
+    model.clear_noise()
+    with torch.no_grad():
+        model.set_add(dev_var, write_var)
+        for images, labels in testloader:
+            images, labels = images.to(device), labels.to(device)
+            # images = images.view(-1, 784)
+            outputs = model(images)
+            if len(outputs) == 2:
+                outputs = outputs[0]
+            predictions = outputs.argmax(dim=1)
+            correction = predictions == labels
+            correct += correction.sum()
+            total += len(correction)
+    return (correct/total).cpu().numpy()
+
+def NEachEval(dev_var, write_var, index):
+    model.eval()
+    total = 0
+    correct = 0
+    here = 0
     model.clear_noise()
     with torch.no_grad():
         for images, labels in testloader:
             model.clear_noise()
-            model.set_noise(var)
+            model.set_noise(dev_var, 0)
             images, labels = images.to(device), labels.to(device)
             # images = images.view(-1, 784)
             outputs = model(images)
@@ -68,7 +93,7 @@ def NEachEval(var):
             total += len(correction)
     return (correct/total).cpu().numpy()
 
-def NTrain(epochs, header, var, verbose=False):
+def NTrain(epochs, header, dev_var, write_var, verbose=False):
     best_acc = 0.0
     for i in range(epochs):
         model.train()
@@ -76,7 +101,7 @@ def NTrain(epochs, header, var, verbose=False):
         # for images, labels in tqdm(trainloader):
         for images, labels in trainloader:
             model.clear_noise()
-            model.set_noise(var)
+            # model.set_noise(dev_var, write_var)
             optimizer.zero_grad()
             images, labels = images.to(device), labels.to(device)
             # images = images.view(-1, 784)
@@ -85,13 +110,23 @@ def NTrain(epochs, header, var, verbose=False):
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
-        test_acc = NEachEval(var)
+        # test_acc = NEachEval(dev_var, write_var)
+        test_acc = CEval()
         if test_acc > best_acc:
             best_acc = test_acc
             torch.save(model.state_dict(), f"tmp_best_{header}.pt")
         if verbose:
             print(f"epoch: {i:-3d}, test acc: {test_acc:.4f}, loss: {running_loss / len(trainloader):.4f}")
         scheduler.step()
+
+def RecoverBN(epoch):
+    model.train()
+    model.clear_noise()
+    for _ in range(epoch):
+        # for images, labels in tqdm(trainloader):
+        for images, labels in trainloader:
+            images, labels = images.to(device), labels.to(device)
+            outputs, outputsS = model(images)
 
 def GetSecond():
     model.eval()
@@ -104,6 +139,17 @@ def GetSecond():
         outputs, outputsS = model(images)
         loss = criteria(outputs, outputsS,labels)
         loss.backward()
+        # sail_list = None
+        # for m in model.modules():
+        #     if isinstance(m, SModule):
+        #         sail = m.mask_indicator("second", 0).view(-1)
+        #         if sail_list is None:
+        #             sail_list = sail
+        #         else:
+        #             sail_list = torch.cat([sail_list, sail])
+        # import time
+        # torch.save(sail_list, f"S_grad_{time.time()}.pt")
+        # exit()
 
 def str2bool(a):
     if a == "True":
@@ -118,23 +164,27 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--train_epoch', action='store', type=int, default=20,
             help='# of epochs of training')
-    parser.add_argument('--fine_epoch', action='store', type=int, default=20,
-            help='# of epochs of finetuning')
     parser.add_argument('--noise_epoch', action='store', type=int, default=100,
             help='# of epochs of noise validations')
-    parser.add_argument('--noise_var', action='store', type=float, default=0.1,
-            help='noise variation')
+    parser.add_argument('--train_var', action='store', type=float, default=0.0,
+            help='device variation [std] when training')
+    parser.add_argument('--dev_var', action='store', type=float, default=0.3,
+            help='device variation [std] before write and verify')
+    parser.add_argument('--write_var', action='store', type=float, default=0.03,
+            help='device variation [std] after write and verify')
     parser.add_argument('--mask_p', action='store', type=float, default=0.01,
             help='portion of the mask')
     parser.add_argument('--device', action='store', default="cuda:0",
             help='device used')
     parser.add_argument('--verbose', action='store', type=str2bool, default=False,
             help='see training process')
-    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR", "Res18", "TIN"],
+    parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR", "Res18", "TIN", "QLeNet", "QCIFAR", "QRes18", "QDENSE", "QTIN", "QVGG"],
             help='model to use')
-    parser.add_argument('--method', action='store', default="second", choices=["second", "magnitude", "saliency", "r_saliency", "subtract"],
+    parser.add_argument('--method', action='store', default="SM", choices=["second", "magnitude", "saliency", "random", "SM"],
             help='method used to calculate saliency')
-    parser.add_argument('--alpha', action='store', type=float, default=1.0,
+    parser.add_argument('--NM', action='store', default="noise", choices=["add", "noise"],
+            help='method used to calculate saliency')
+    parser.add_argument('--alpha', action='store', type=float, default=1e6,
             help='weight used in saliency - substract')
     parser.add_argument('--header', action='store',type=int, default=1,
             help='use which saved state dict')
@@ -148,10 +198,10 @@ if __name__ == "__main__":
             help='if to save the files')
     parser.add_argument('--calc_S', action='store',type=str2bool, default=True,
             help='if calculated S grad if not necessary')
-    parser.add_argument('--optimizer', action='store', default="SGD", choices=["SGD", "Adam"],
-            help='optimizer to use')
     parser.add_argument('--div', action='store', type=int, default=1,
             help='division points for second')
+    parser.add_argument('--points', action='store',type=int, default=100,
+            help='if do it layer by layer')
     args = parser.parse_args()
 
     print(args)
@@ -163,7 +213,7 @@ if __name__ == "__main__":
 
     BS = 128
 
-    if args.model == "CIFAR" or args.model == "Res18":
+    if args.model == "CIFAR" or args.model == "Res18" or args.model == "QCIFAR" or args.model == "QRes18" or args.model == "QDENSE":
         normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
         transform = transforms.Compose(
         [transforms.ToTensor(),
@@ -180,7 +230,7 @@ if __name__ == "__main__":
         secondloader = torch.utils.data.DataLoader(trainset, batch_size=BS//args.div, shuffle=False, num_workers=4)
         testset = torchvision.datasets.CIFAR10(root='~/Private/data', train=False, download=False, transform=transform)
         testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=4)
-    elif args.model == "TIN":
+    elif args.model == "TIN" or args.model == "QTIN" or args.model == "QVGG":
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])
         transform = transforms.Compose(
@@ -194,10 +244,10 @@ if __name__ == "__main__":
                 normalize,
                 ])
         trainset = torchvision.datasets.ImageFolder(root='~/Private/data/tiny-imagenet-200/train', transform=train_transform)
-        trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS, shuffle=True, num_workers=4)
-        secondloader = torch.utils.data.DataLoader(trainset, batch_size=BS//args.div, shuffle=False, num_workers=4)
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=BS, shuffle=True, num_workers=8)
+        secondloader = torch.utils.data.DataLoader(trainset, batch_size=BS//args.div, shuffle=False, num_workers=8)
         testset = torchvision.datasets.ImageFolder(root='~/Private/data/tiny-imagenet-200/val',  transform=transform)
-        testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=4)
+        testloader = torch.utils.data.DataLoader(testset, batch_size=BS, shuffle=False, num_workers=8)
     else:
         trainset = torchvision.datasets.MNIST(root='~/Private/data', train=True,
                                                 download=False, transform=transforms.ToTensor())
@@ -219,47 +269,88 @@ if __name__ == "__main__":
     elif args.model == "LeNet":
         model = SLeNet()
     elif args.model == "CIFAR":
-        model = FakeCIFAR()
+        model = CIFAR()
     elif args.model == "Res18":
         model = resnet.resnet18(num_classes = 10)
     elif args.model == "TIN":
         model = resnet.resnet18(num_classes = 200)
+    elif args.model == "QLeNet":
+        model = QSLeNet()
+    elif args.model == "QCIFAR":
+        model = QCIFAR()
+    elif args.model == "QRes18":
+        model = qresnet.resnet18(num_classes = 10)
+    elif args.model == "QDENSE":
+        model = qdensnet.densenet121(num_classes = 10)
+    elif args.model == "QTIN":
+        model = qresnet.resnet18(num_classes = 200)
+    elif args.model == "QVGG":
+        model = qvgg.vgg11(num_classes = 200)
+    else:
+        NotImplementedError
 
     model.to(device)
     model.push_S_device()
     model.clear_noise()
     model.clear_mask()
     criteria = SCrossEntropyLoss()
+    criteriaF = torch.nn.CrossEntropyLoss()
 
     # optimizer = optim.Adam(model.parameters(), lr=0.01)
     # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
 
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [60])
-    if not args.pretrained:
-        NTrain(args.train_epoch, header, args.noise_var, args.verbose)
-        state_dict = torch.load(f"tmp_best_{header}.pt")
-        model.load_state_dict(state_dict)
-        torch.save(model.state_dict(), f"saved_B_{header}.pt")
+    if "TIN" in args.model or "Res" in args.model or "VGG" in args.model or "DENSE" in args.model:
+    # if "TIN" in args.model or "Res" in args.model:
+        optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.train_epoch)
+        # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [1000])
+    else:
+        optimizer = optim.Adam(model.parameters(), lr=1e-3)
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [60])
 
-        no_mask_acc_list = []
+    if not args.pretrained:
+        model.to_first_only()
+        NTrain(args.train_epoch, header, args.train_var, 0.0, args.verbose)
+        if args.train_var > 0:
+            state_dict = torch.load(f"tmp_best_{header}.pt")
+            model.load_state_dict(state_dict)
+        model.from_first_back_second()
+        torch.save(model.state_dict(), f"saved_B_{header}.pt")
         state_dict = torch.load(f"saved_B_{header}.pt")
-        # print(f"No mask no noise: {CEval():.4f}")
+        print(f"No mask no noise: {CEval():.4f}")
         model.load_state_dict(state_dict)
         model.clear_mask()
+
+        no_mask_acc_list = []
         loader = range(args.noise_epoch)
         for _ in loader:
-            acc = NEval(args.noise_var)
+            acc = NEval(args.dev_var, 0.0)
             no_mask_acc_list.append(acc)
         print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
-        torch.save(no_mask_acc_list, f"no_mask_list_{header}_{args.noise_var}.pt")
+        torch.save(no_mask_acc_list, f"no_mask_list_{header}_{args.dev_var}.pt")
 
-        # exit()
+        no_mask_acc_list = []
+        loader = range(args.noise_epoch)
+        for _ in loader:
+            acc = NEval(args.write_var, 0.0)
+            no_mask_acc_list.append(acc)
+        print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
+        torch.save(no_mask_acc_list, f"no_mask_list_{header}_{args.write_var}.pt")
+
+        exit()
     else:
         parent_path = args.model_path
         header = args.header
-        no_mask_acc_list = torch.load(os.path.join(parent_path, f"no_mask_list_{header}_{args.noise_var}.pt"))
-        print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
+        try:
+            no_mask_acc_list = torch.load(os.path.join(parent_path, f"no_mask_list_{header}_{args.dev_var}.pt"))
+            print(f"[{args.dev_var}] No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
+        except:
+            print(f"[{args.dev_var}] Not Found")
+        try:
+            no_mask_acc_list = torch.load(os.path.join(parent_path, f"no_mask_list_{header}_{args.write_var}.pt"))
+            print(f"[{args.write_var}] No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
+        except:
+            print(f"[{args.write_var}] Not Found")
         model.back_real(device)
         model.push_S_device()
 
@@ -269,70 +360,49 @@ if __name__ == "__main__":
     model.back_real(device)
     model.push_S_device()
     criteria = SCrossEntropyLoss()
-    criteriaF = torch.nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.01)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
     model.clear_noise()
+
     model.normalize()
+    print(f"No mask no noise: {CEval():.4f}")
     GetSecond()
     print(f"S grad before masking: {model.fetch_S_grad().item():E}")
-    
-    if args.use_mask:
-        th = model.calc_sail_th(args.mask_p, args.method, args.alpha)
-        model.de_normalize()
-        RM_old = 0
-        first = True
-        for i in range(10):
-            model.clear_noise()
-            model.normalize()
-            if first:
-                first = False
-            else:
-                model.clear_S_grad()
-                GetSecond()
-            model.set_mask_sail(th, "th", args.method, args.alpha)
-            total, RM_new = model.get_mask_info()
-            print(f"Total weights removed {RM_new/total:.6f}")
-            if (RM_new - RM_old) <= (total * 1e-6):
-                break
-            RM_old = RM_new
-            model.de_normalize()
-            # print(f"with mask no noise: {CEval():.4f}")
-            print(f"S grad after masking: {model.fetch_S_grad().item():E}")
-            if args.calc_S:
-                GetSecond()
-                print(f"S grad after masking: {model.fetch_S_grad().item():E}")
-            
-            model.to_first_only()
-            model.to(device)
-            model.push_S_device()
-            print(f"with mask no noise: {CEval():.4f}")
-            if args.optimizer == "SGD":
-                optimizer = optim.SGD(model.parameters(), lr=1e-4)
-            elif args.optimizer == "Adam":
-                optimizer = optim.Adam(model.parameters(), lr=1e-5)
-            else:
-                raise NotImplementedError
-            scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
-            NTrain(args.fine_epoch, header_timer, args.noise_var, args.verbose)
-            print(f"Finetune no noise: {CEval():.4f}")
-            if args.save_file:
-                torch.save(model.state_dict(), f"saved_A_{header}_{header_timer}_{i}.pt")
+    model.fine_S_grad()
+    sail_list = None
+    for m in model.modules():
+            if isinstance(m, SModule):
+                sail = m.mask_indicator(args.method, args.alpha).view(-1)
+                if sail_list is None:
+                    sail_list = sail
+                else:
+                    sail_list = torch.cat([sail_list, sail])
+    indexes = np.random.choice(list(range(len(sail_list))), args.points, replace=False)
+    for i in range(args.points):
+        model.clear_mask()
+        index = indexes[i]
+        here = 0
+        for m in model.modules():
+            if isinstance(m, SModule):
+                if here + len(m.weightS.view(-1)) > index:
+                    m.mask.view(-1)[index - here] = 0
+                    # print(m.mask)
+                    print(f"Values: {sail_list[index].item():.4f}, {m.op.weight.data.view(-1)[index - here].abs().item():.4f}")
+                    break
+                else:
+                    here += len(m.weightS.view(-1))
+        
+        for m in model.modules():
+            if isinstance(m, SModule):
+                m.mask = 1. - m.mask
+                # print(m.mask.sum().item())
+        if args.NM == "noise":
             fine_mask_acc_list = []
-            
             loader = range(args.noise_epoch)
             for _ in loader:
-                acc = NEval(args.noise_var)
+                acc = NEval(args.dev_var, 0)
                 fine_mask_acc_list.append(acc)
             print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
-            model.from_first_back_second()
-            model.to(device)
-            model.push_S_device()
-            model.clear_noise()
-            optimizer = optim.Adam(model.parameters(), lr=1e-5)
-            if args.calc_S:
-                GetSecond()
-                print(f"S grad after finetune: {model.fetch_S_grad().item():E}")
-            
-            
-        os.system(f"rm tmp_best_{header_timer}.pt")
+        else:
+            acc = AEval(args.dev_var, 0)
+            print(f"Finetune noise average acc: {acc:.4f}")
