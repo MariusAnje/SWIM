@@ -53,6 +53,25 @@ def NEval(dev_var, write_var):
             total += len(correction)
     return (correct/total).cpu().numpy()
 
+def AEval(dev_var, write_var):
+    model.eval()
+    total = 0
+    correct = 0
+    model.clear_noise()
+    with torch.no_grad():
+        model.set_add(dev_var, write_var)
+        for images, labels in testloader:
+            images, labels = images.to(device), labels.to(device)
+            # images = images.view(-1, 784)
+            outputs = model(images)
+            if len(outputs) == 2:
+                outputs = outputs[0]
+            predictions = outputs.argmax(dim=1)
+            correction = predictions == labels
+            correct += correction.sum()
+            total += len(correction)
+    return (correct/total).cpu().numpy()
+
 def NEachEval(dev_var, write_var, index):
     model.eval()
     total = 0
@@ -162,6 +181,8 @@ if __name__ == "__main__":
     parser.add_argument('--model', action='store', default="MLP4", choices=["MLP3", "MLP4", "LeNet", "CIFAR", "Res18", "TIN", "QLeNet", "QCIFAR", "QRes18", "QDENSE", "QTIN", "QVGG"],
             help='model to use')
     parser.add_argument('--method', action='store', default="SM", choices=["second", "magnitude", "saliency", "random", "SM"],
+            help='method used to calculate saliency')
+    parser.add_argument('--NM', action='store', default="noise", choices=["add", "noise"],
             help='method used to calculate saliency')
     parser.add_argument('--alpha', action='store', type=float, default=1e6,
             help='weight used in saliency - substract')
@@ -343,7 +364,7 @@ if __name__ == "__main__":
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
     model.clear_noise()
 
-    # model.normalize()
+    model.normalize()
     print(f"No mask no noise: {CEval():.4f}")
     GetSecond()
     print(f"S grad before masking: {model.fetch_S_grad().item():E}")
@@ -358,6 +379,7 @@ if __name__ == "__main__":
                     sail_list = torch.cat([sail_list, sail])
     indexes = np.random.choice(list(range(len(sail_list))), args.points, replace=False)
     for i in range(args.points):
+        model.clear_mask()
         index = indexes[i]
         here = 0
         for m in model.modules():
@@ -373,10 +395,14 @@ if __name__ == "__main__":
         for m in model.modules():
             if isinstance(m, SModule):
                 m.mask = 1. - m.mask
-
-        fine_mask_acc_list = []
-        loader = range(args.noise_epoch)
-        for _ in loader:
-            acc = NEval(args.dev_var, 0)
-            fine_mask_acc_list.append(acc)
-        print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
+                # print(m.mask.sum().item())
+        if args.NM == "noise":
+            fine_mask_acc_list = []
+            loader = range(args.noise_epoch)
+            for _ in loader:
+                acc = NEval(args.dev_var, 0)
+                fine_mask_acc_list.append(acc)
+            print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
+        else:
+            acc = AEval(args.dev_var, 0)
+            print(f"Finetune noise average acc: {acc:.4f}")

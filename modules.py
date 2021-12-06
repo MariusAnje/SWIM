@@ -35,6 +35,18 @@ class SModule(nn.Module):
 
         self.noise = noise_dev * self.mask + noise_write * (1 - self.mask)
     
+    def set_add(self, dev_var, write_var, N, m):
+        # N: number of bits per weight, m: number of bits per device
+        # Dev_var: device variation before write and verify
+        # write_var: device variation after write and verity
+        scale = self.op.weight.abs().max()
+        noise_dev = torch.ones_like(self.noise).to(self.op.weight.device) * dev_var
+        noise_write = torch.ones_like(self.noise).to(self.op.weight.device) * write_var
+        noise_dev = noise_dev.to(self.op.weight.device) * scale
+        noise_write = noise_write.to(self.op.weight.device) * scale
+
+        self.noise = noise_dev * self.mask + noise_write * (1 - self.mask)
+    
     def clear_noise(self):
         self.noise = torch.zeros_like(self.op.weight)
     
@@ -329,7 +341,12 @@ class NModel(nn.Module):
         for mo in self.modules():
             if isinstance(mo, NModule):
                 mo.set_noise(dev_var, write_var, N, m)
-    
+   
+    def set_add(self, dev_var, write_var, N=8, m=1):
+        for mo in self.modules():
+            if isinstance(mo, NModule):
+                mo.set_add(dev_var, write_var, N, m) 
+
     def clear_noise(self):
         for m in self.modules():
             if isinstance(m, NModule):
@@ -418,6 +435,11 @@ class SModel(nn.Module):
             if isinstance(mo, SModule) or isinstance(mo, NModule):
                 mo.set_noise(dev_var, write_var, N, m)
     
+    def set_add(self, dev_var, write_var, N=8, m=1):
+        for mo in self.modules():
+            if isinstance(mo, SModule) or isinstance(mo, NModule):
+                mo.set_add(dev_var, write_var, N, m)    
+
     def clear_noise(self):
         for m in self.modules():
             if isinstance(m, SModule):
