@@ -230,7 +230,7 @@ if __name__ == "__main__":
     elif args.model == "LeNet":
         model = SLeNet()
     elif args.model == "CIFAR":
-        model = FakeCIFAR()
+        model = CIFAR()
     elif args.model == "Res18":
         model = resnet.resnet18(num_classes = 10)
     elif args.model == "TIN":
