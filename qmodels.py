@@ -1,10 +1,16 @@
 import torch
 from torch import nn
 from Functions import SCrossEntropyLossFunction
-from modules import SReLU, SModel, SMaxpool2D
+from modules import SReLU, SModel, SMaxpool2D, SModule, NModule
 from qmodules import QSLinear, QSConv2d
 
-class QSMLP3(SModel):
+class QSModel(SModel):
+    def set_quantization(self, N):
+        for m in self.modules():
+            if isinstance(m, SModule) or isinstance(m, NModule):
+                m.N = N
+
+class QSMLP3(QSModel):
     def __init__(self, N=4):
         super().__init__()
         self.fc1 = QSLinear(N, 28*28,32)
@@ -24,7 +30,7 @@ class QSMLP3(SModel):
         x = self.fc3(x)
         return x
 
-class QSMLP4(SModel):
+class QSMLP4(QSModel):
     def __init__(self, N=4):
         super().__init__()
         self.fc1 = QSLinear(N, 28*28,32)
@@ -48,7 +54,7 @@ class QSMLP4(SModel):
         return x
 
 
-class QSLeNet(SModel):
+class QSLeNet(QSModel):
 
     def __init__(self, N=4):
         super().__init__()
@@ -93,7 +99,7 @@ class QSLeNet(SModel):
             num_features *= s
         return num_features
 
-class QCIFAR(SModel):
+class QCIFAR(QSModel):
     def __init__(self, N=6):
         super().__init__()
 
@@ -143,6 +149,45 @@ class QCIFAR(SModel):
         x = self.fc2(x)
         x = self.relu(x)
         x = self.fc3(x)
+        return x
+
+    def num_flat_features(self, x):
+        size = x.size()[1:]  # all dimensions except the batch dimension
+        num_features = 1
+        for s in size:
+            num_features *= s
+        return num_features
+
+class QSNNet(QSModel):
+
+    def __init__(self, N=4):
+        super().__init__()
+        # 1 input image channel, 6 output channels, 3x3 square convolution
+        # kernel
+        self.conv1 = QSConv2d(N, 1, 8, 3, padding=0)
+        self.conv2 = QSConv2d(N, 8, 12, 3, padding=0)
+        # an affine operation: y = Wx + b
+        self.fc1 = QSLinear(N, 12 * 4 * 4, 10)
+        self.pool1 = SMaxpool2D(kernel_size=3, padding=1)
+        self.pool2 = SMaxpool2D(kernel_size=2, padding=1)
+        self.relu = SReLU()
+
+    def forward(self, x):
+        xS = torch.zeros_like(x)
+        if not self.first_only:
+            x = (x, xS)
+        x = self.conv1(x)
+
+        x = self.relu(x)
+        x = self.pool1(x)
+        
+        x = self.conv2(x)
+        x = self.relu(x)
+        x = self.pool2(x)
+        
+        x = self.unpack_flattern(x)
+        
+        x = self.fc1(x)
         return x
 
     def num_flat_features(self, x):

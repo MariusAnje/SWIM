@@ -50,10 +50,11 @@ class SLinearFunction(autograd.Function):
     # bias is an optional argument
     def forward(ctx, input, inputS, weight, weightS, bias=None):
         ctx.save_for_backward(input, weight, bias)
-        output = input.mm(weight.t())
-        # outputS = inputS.mm(weightS.t())
-        if bias is not None:
-            output += bias.unsqueeze(0).expand_as(output)
+        # output = input.mm(weight.t())
+        # # outputS = inputS.mm(weightS.t())
+        # if bias is not None:
+        #     output += bias.unsqueeze(0).expand_as(output)
+        output = F.linear(input, weight, bias)
         return output, torch.ones_like(output)#outputS
 
     # This function has only a single output, so it gets only one gradient

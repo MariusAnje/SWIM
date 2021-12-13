@@ -15,6 +15,7 @@ from tqdm import tqdm
 import time
 import argparse
 import os
+from copy import deepcopy
 
 def CEval():
     model.eval()
@@ -355,8 +356,13 @@ if __name__ == "__main__":
         model.push_S_device()
 
     
+    pModel = deepcopy(model)
     state_dict = torch.load(os.path.join(parent_path, f"saved_B_{header}.pt"), map_location=device)
+    pState_dict = torch.load(os.path.join(parent_path, f"saved_B_{header}.pt"), map_location=device)
     model.load_state_dict(state_dict)
+    pModel.load_state_dict(pState_dict)
+    pModel.back_real(device)
+    pModel.push_S_device()
     model.back_real(device)
     model.push_S_device()
     criteria = SCrossEntropyLoss()
@@ -377,6 +383,27 @@ if __name__ == "__main__":
                     sail_list = sail
                 else:
                     sail_list = torch.cat([sail_list, sail])
+    
+    for m in pModel.modules():
+        if isinstance(m, SModule):
+                m.op.weight.data = m.op.weight.data ** 2
+                if m.op.bias is not None:
+                    m.op.bias.data = m.op.bias.data ** 2
+    lol = next(iter(trainloader))
+    XX = torch.ones_like(lol[0])
+    YY = pModel(XX)[0].sum() / XX.size(0)
+    YY.backward()
+    path_list = None
+    for m in pModel.modules():
+            if isinstance(m, SModule):
+                path = m.op.weight.grad.data.view(-1)
+                if path_list is None:
+                    path_list = path
+                else:
+                    path_list = torch.cat([path_list, path])
+
+    torch.save([sail_list, path_list], "sail_n_path.pt")
+
     indexes = np.random.choice(list(range(len(sail_list))), args.points, replace=False)
     for i in range(args.points):
         model.clear_mask()
@@ -387,7 +414,7 @@ if __name__ == "__main__":
                 if here + len(m.weightS.view(-1)) > index:
                     m.mask.view(-1)[index - here] = 0
                     # print(m.mask)
-                    print(f"Values: {sail_list[index].item():.4f}, {m.op.weight.data.view(-1)[index - here].abs().item():.4f}")
+                    print(f"Values: {sail_list[index].item():.4f}, {path_list[index].item():.4f}, {m.op.weight.data.view(-1)[index - here].abs().item():.4f}")
                     break
                 else:
                     here += len(m.weightS.view(-1))

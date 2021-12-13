@@ -321,6 +321,67 @@ class SBatchNorm2d(nn.Module):
         x, xS = self.function(x, xS, self.op.running_mean, self.op.running_var, self.op.weight, self.op.bias, self.op.training, self.op.momentum, self.op.eps)
         return x, xS
 
+class SAct(nn.Module):
+    def __init__(self, size):
+        super().__init__()
+        self.size = size
+        self.noise = torch.zeros(self.size)
+        self.mask = torch.ones(self.size)
+    
+    def copy_N(self):
+        new = NAct(self.size)
+        new.noise = self.noise
+        new.mask = self.mask
+        return new
+    
+    def clear_noise(self):
+        self.noise = torch.zeros(self.size)
+    
+    def clear_mask(self):
+        self.mask = torch.ones(self.size)
+    
+    def set_noise(self, var):
+        self.noise = torch.randn(self.size) * var
+        
+    def push_S_device(self, device):
+        self.mask = self.mask.to(device)
+        self.noise = self.noise.to(device)
+
+    def forward(self, xC):
+        x, xS = xC
+        x = (x + self.noise) * self.mask
+        xS = xS * self.mask
+        return x, xS
+
+class NAct(nn.Module):
+    def __init__(self, size):
+        super().__init__()
+        self.size = size
+        self.noise = torch.zeros(self.size)
+        self.mask = torch.ones(self.size)
+    
+    def copy_S(self):
+        new = SAct(self.size)
+        new.noise = self.noise
+        new.mask = self.mask
+        return new
+    
+    def clear_noise(self):
+        self.noise = torch.zeros(self.size)
+    
+    def clear_mask(self):
+        self.mask = torch.ones(self.size)
+    
+    def set_noise(self, var):
+        self.noise = torch.randn(self.size) * var
+        
+    def push_S_device(self, device):
+        self.mask = self.mask.to(device)
+        self.noise = self.noise.to(device)
+
+    def forward(self, x):
+        return x + self.noise * self.mask
+
 class FakeSModule(nn.Module):
     def __init__(self, op):
         super().__init__()
@@ -339,24 +400,27 @@ class NModel(nn.Module):
 
     def set_noise(self, dev_var, write_var, N=8, m=1):
         for mo in self.modules():
-            if isinstance(mo, NModule):
+            if isinstance(mo, NModule) or isinstance(mo, SModule):
                 mo.set_noise(dev_var, write_var, N, m)
    
     def set_add(self, dev_var, write_var, N=8, m=1):
         for mo in self.modules():
-            if isinstance(mo, NModule):
+            if isinstance(mo, NModule) or isinstance(mo, SModule):
                 mo.set_add(dev_var, write_var, N, m) 
 
     def clear_noise(self):
         for m in self.modules():
-            if isinstance(m, NModule):
+            if isinstance(m, NModule) or isinstance(m, SModule) or isinstance(m, SAct) or isinstance(m, NAct):
                 m.clear_noise()
     
     def push_S_device(self):
         for m in self.modules():
-            if isinstance(m, NModule):
+            if isinstance(m, NModule) or isinstance(m, SModule):
             # if isinstance(m, NLinear) or isinstance(m, NConv2d):
                 m.push_S_device()
+                device = m.op.weight.device
+            if isinstance(m, SAct) or isinstance(m, NAct):
+                m.push_S_device(device)
 
 class SModel(nn.Module):
     def __init__(self):
@@ -382,8 +446,11 @@ class SModel(nn.Module):
 
     def push_S_device(self):
         for m in self.modules():
-            if isinstance(m, SModule):
+            if isinstance(m, SModule) or isinstance(m, NModule):
                 m.push_S_device()
+                device = m.weightS.device
+            if isinstance(m, SAct) or isinstance(m, NAct):
+                m.push_S_device(device)
 
     def clear_S_grad(self):
         for m in self.modules():
@@ -442,14 +509,14 @@ class SModel(nn.Module):
 
     def clear_noise(self):
         for m in self.modules():
-            if isinstance(m, SModule):
+            if isinstance(m, SModule) or isinstance(m, NModule) or isinstance(m, SAct) or isinstance(m, NAct):
                 m.clear_noise()
     
     def get_mask_info(self):
         total = 0
         RM = 0
         for m in self.modules():
-            if isinstance(m, SModule):
+            if isinstance(m, SModule) or isinstance(m, NModule):
                 t, r = m.get_mask_info()
                 total += t
                 RM += r
@@ -472,7 +539,7 @@ class SModel(nn.Module):
     
     def clear_mask(self):
         for m in self.modules():
-            if isinstance(m, SModule):
+            if isinstance(m, SModule) or isinstance(m, NModule) or isinstance(m, SAct) or isinstance(m, NAct):
                 m.clear_mask()
     
     def to_fake(self, device):
@@ -488,7 +555,7 @@ class SModel(nn.Module):
             if isinstance(m, SModel):
                 m.first_only = True
         for n, m in self.named_modules():
-            if isinstance(m, SModule):
+            if isinstance(m, SModule) or isinstance(m, SAct):
                 n = n.split(".")
                 father = self
                 for i in range(len(n) - 1):
@@ -506,39 +573,40 @@ class SModel(nn.Module):
                     father._modules[n[-1]].return_indices = False
 
     def from_first_back_second(self):
-        self.first_only = False
-        for m in self.modules():
-            if isinstance(m, SModel):
-                m.first_only = False
-        for n, m in self.named_modules():
-            if isinstance(m, NModule):
-                n = n.split(".")
-                father = self
-                for i in range(len(n) - 1):
-                    father = father._modules[n[i]]
-                mo = father._modules[n[-1]]
-                new = mo.copy_S()
-                father._modules[n[-1]] = new
-            if isinstance(m, nn.ReLU) or isinstance(m, nn.MaxPool2d) or isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.AdaptiveAvgPool2d) or isinstance(m, nn.AvgPool2d):
-                n = n.split(".")
-                father = self
-                for i in range(len(n) - 1):
-                    father = father._modules[n[i]]
-                if isinstance(m, nn.ReLU):
-                    new = SReLU(m.inplace)
-                elif isinstance(m, nn.MaxPool2d):
-                    new = SMaxpool2D(m.kernel_size, m.stride, m.padding, m.dilation, True, m.ceil_mode)
-                elif isinstance(m, nn.AdaptiveAvgPool2d):
-                    new = SAdaptiveAvgPool2d(m.output_size)
-                    new.op = m
-                elif isinstance(m, nn.AvgPool2d):
-                    new = SAvgPool2d(m.kernel_size, m.stride, m.padding, m.ceil_mode, m.count_include_pad, m.divisor_override)
-                    new.op = m
-                elif isinstance(m, nn.BatchNorm2d):
-                    new = SBatchNorm2d(m.num_features)
-                    new.op = m
-                # TODO: Other modules specified above
-                father._modules[n[-1]] = new
+        if self.first_only:
+            self.first_only = False
+            for m in self.modules():
+                if isinstance(m, SModel):
+                    m.first_only = False
+            for n, m in self.named_modules():
+                if isinstance(m, NModule) or isinstance(m, NAct):
+                    n = n.split(".")
+                    father = self
+                    for i in range(len(n) - 1):
+                        father = father._modules[n[i]]
+                    mo = father._modules[n[-1]]
+                    new = mo.copy_S()
+                    father._modules[n[-1]] = new
+                if isinstance(m, nn.ReLU) or isinstance(m, nn.MaxPool2d) or isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.AdaptiveAvgPool2d) or isinstance(m, nn.AvgPool2d):
+                    n = n.split(".")
+                    father = self
+                    for i in range(len(n) - 1):
+                        father = father._modules[n[i]]
+                    if isinstance(m, nn.ReLU):
+                        new = SReLU(m.inplace)
+                    elif isinstance(m, nn.MaxPool2d):
+                        new = SMaxpool2D(m.kernel_size, m.stride, m.padding, m.dilation, True, m.ceil_mode)
+                    elif isinstance(m, nn.AdaptiveAvgPool2d):
+                        new = SAdaptiveAvgPool2d(m.output_size)
+                        new.op = m
+                    elif isinstance(m, nn.AvgPool2d):
+                        new = SAvgPool2d(m.kernel_size, m.stride, m.padding, m.ceil_mode, m.count_include_pad, m.divisor_override)
+                        new.op = m
+                    elif isinstance(m, nn.BatchNorm2d):
+                        new = SBatchNorm2d(m.num_features)
+                        new.op = m
+                    # TODO: Other modules specified above
+                    father._modules[n[-1]] = new
 
     def normalize(self):
         for mo in self.modules():
