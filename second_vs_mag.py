@@ -390,7 +390,7 @@ if __name__ == "__main__":
                 if m.op.bias is not None:
                     m.op.bias.data = m.op.bias.data ** 2
     lol = next(iter(trainloader))
-    XX = torch.ones_like(lol[0])
+    XX = torch.ones_like(lol[0]).to(device)
     YY = pModel(XX)[0].sum() / XX.size(0)
     YY.backward()
     path_list = None
