@@ -38,7 +38,7 @@ class TimesFunction(autograd.Function):
     def backward(ctx, grad_output, grad_outputS):
 
         grad_x = grad_output * ctx.a
-        grad_xS = grad_output * (ctx.a ** 2)
+        grad_xS = grad_outputS * (ctx.a ** 2)
 
         return grad_x, grad_xS, None
 
