@@ -48,8 +48,8 @@ This repo is quite friendly for those who are familar with PyTorch.
 
 ### Implemented modules
 All modules are implemented for efficient second derivative calculation.  
-For each computational module (e.g., fully connected and convolutional), there is a wrapper module called ''SModule''. SModule.op is the wrapped operation (layer), SModule.weightS is a dummy placholder to host the second derivative of its weight, SModule.noise is an instance of noise caused by device varitaions and SModule.mask is a mask that shows which weight is protected by write-verify.  
-Note that the syntax for each layer wrapped by SModule is exactly the same as the PyTorch version, except that they takes two inputs: ''input'' and ''inputS''. ''input'' is the traditional input and inputS is a dummy palceholder to host the second derivative of ''input''.   
+For each computational module (e.g., fully connected and convolutional), there is a wrapper module called "SModule". SModule.op is the wrapped operation (layer), SModule.weightS is a dummy placeholder to host the second derivative of its weight, SModule.noise is an instance of noise caused by device variations and SModule.mask is a mask that shows which weight is protected by write-verify.  
+Note that the syntax for each layer wrapped by SModule is exactly the same as the PyTorch version, except that they takes two inputs: "input" and "inputS". "input" is the traditional input and inputS is a dummy placeholder to host the second derivative of "input".   
 A list of modules implemented is:
 1. SLinear
 2. SConv2d
@@ -60,8 +60,11 @@ A list of modules implemented is:
 7. SAdaptiveAvgPool2d
 8. SAvgPool2d
 
+### Looking for second derivative
+Second derivatives for each weight is stored in SModule.weightS.grad after running "GetSecond" function in selective_write.py. The first order derivatives are in SModule.op.weight.grad
+
 ### Wrting new models
-Please refer to model_zoo/models.py to the syntax of writing basic convolutional models.
-Please refer to model_zoo/resnet.py to the syntax of writing skip connections.
-Please refer to model_zoo/qmodels.py to the syntax of writing quantized models.
+Please refer to model_zoo/models.py to the syntax of writing basic convolutional models.  
+Please refer to model_zoo/resnet.py to the syntax of writing skip connections.  
+Please refer to model_zoo/qmodels.py to the syntax of writing quantized models.  
 
