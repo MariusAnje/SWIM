@@ -2,13 +2,7 @@ import torch
 from torch import nn
 from Functions import SCrossEntropyLossFunction
 from modules import SReLU, SModel, SMaxpool2D, SModule, NModule
-from qmodules import QSLinear, QSConv2d
-
-class QSModel(SModel):
-    def set_quantization(self, N):
-        for m in self.modules():
-            if isinstance(m, SModule) or isinstance(m, NModule):
-                m.N = N
+from qmodules import QSLinear, QSConv2d, QSModel
 
 class QSMLP3(QSModel):
     def __init__(self, N=4):

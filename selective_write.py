@@ -3,14 +3,14 @@ import torchvision
 from torch import optim
 import torchvision.transforms as transforms
 import numpy as np
-from models import SCrossEntropyLoss, SMLP3, SMLP4, SLeNet, CIFAR, FakeSCrossEntropyLoss
+from model_zoo.models import SMLP3, SMLP4, SLeNet, CIFAR 
 import modules
-from qmodels import QSLeNet, QCIFAR
-import resnet
-import qresnet
-import qvgg
-import qdensnet
-from modules import SModule
+from model_zoo.qmodels import QSLeNet, QCIFAR
+from model_zoo import resnet
+from model_zoo import qresnet
+from model_zoo import qvgg
+from model_zoo import qdensnet
+from modules import SModule, SCrossEntropyLoss, FakeSCrossEntropyLoss
 from tqdm import tqdm
 import time
 import argparse
@@ -78,19 +78,18 @@ def NTrain(epochs, header, dev_var, write_var, verbose=False):
     for i in range(epochs):
         model.train()
         running_loss = 0.
-        # for images, labels in tqdm(trainloader):
-        for images, labels in trainloader:
+        for images, labels in tqdm(trainloader):
+        # for images, labels in trainloader:
             model.clear_noise()
             # model.set_noise(dev_var, write_var)
             optimizer.zero_grad()
             images, labels = images.to(device), labels.to(device)
-            # images = images.view(-1, 784)
             outputs = model(images)
             loss = criteriaF(outputs,labels)
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
-        # test_acc = NEachEval(dev_var, write_var)
+        
         test_acc = CEval()
         if test_acc > best_acc:
             best_acc = test_acc
@@ -98,15 +97,6 @@ def NTrain(epochs, header, dev_var, write_var, verbose=False):
         if verbose:
             print(f"epoch: {i:-3d}, test acc: {test_acc:.4f}, loss: {running_loss / len(trainloader):.4f}")
         scheduler.step()
-
-def RecoverBN(epoch):
-    model.train()
-    model.clear_noise()
-    for _ in range(epoch):
-        # for images, labels in tqdm(trainloader):
-        for images, labels in trainloader:
-            images, labels = images.to(device), labels.to(device)
-            outputs, outputsS = model(images)
 
 def GetSecond():
     model.eval()
@@ -119,17 +109,6 @@ def GetSecond():
         outputs, outputsS = model(images)
         loss = criteria(outputs, outputsS,labels)
         loss.backward()
-        # sail_list = None
-        # for m in model.modules():
-        #     if isinstance(m, SModule):
-        #         sail = m.mask_indicator("second", 0).view(-1)
-        #         if sail_list is None:
-        #             sail_list = sail
-        #         else:
-        #             sail_list = torch.cat([sail_list, sail])
-        # import time
-        # torch.save(sail_list, f"S_grad_{time.time()}.pt")
-        # exit()
 
 def str2bool(a):
     if a == "True":
@@ -182,7 +161,7 @@ if __name__ == "__main__":
             help='if do it layer by layer')
     args = parser.parse_args()
 
-    print(args)
+    print("Experimental Setup: ", args)
     header = time.time()
     header_timer = header
     parent_path = "./"
@@ -274,19 +253,15 @@ if __name__ == "__main__":
     criteria = SCrossEntropyLoss()
     criteriaF = torch.nn.CrossEntropyLoss()
 
-    # optimizer = optim.Adam(model.parameters(), lr=0.01)
-    # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [20])
-
     if "TIN" in args.model or "Res" in args.model or "VGG" in args.model or "DENSE" in args.model:
-    # if "TIN" in args.model or "Res" in args.model:
         optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.train_epoch)
-        # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [1000])
     else:
         optimizer = optim.Adam(model.parameters(), lr=1e-3)
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [60])
 
     if not args.pretrained:
+        print("Start training models.")
         model.to_first_only()
         NTrain(args.train_epoch, header, args.train_var, 0.0, args.verbose)
         if args.train_var > 0:
@@ -295,16 +270,17 @@ if __name__ == "__main__":
         model.from_first_back_second()
         torch.save(model.state_dict(), f"saved_B_{header}.pt")
         state_dict = torch.load(f"saved_B_{header}.pt")
-        print(f"No mask no noise: {CEval():.4f}")
+        print(f"Accuracy before masking w/o noise:: {CEval():.4f}")
         model.load_state_dict(state_dict)
         model.clear_mask()
 
+        print("Performance of the trained model under variations:")
         no_mask_acc_list = []
         loader = range(args.noise_epoch)
         for _ in loader:
             acc = NEval(args.dev_var, 0.0)
             no_mask_acc_list.append(acc)
-        print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
+        print(f"[{args.dev_var}] No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
         torch.save(no_mask_acc_list, f"no_mask_list_{header}_{args.dev_var}.pt")
 
         no_mask_acc_list = []
@@ -312,11 +288,12 @@ if __name__ == "__main__":
         for _ in loader:
             acc = NEval(args.write_var, 0.0)
             no_mask_acc_list.append(acc)
-        print(f"No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
+        print(f"[{args.write_var}] No mask noise average acc: {np.mean(no_mask_acc_list):.4f}, std: {np.std(no_mask_acc_list):.4f}")
         torch.save(no_mask_acc_list, f"no_mask_list_{header}_{args.write_var}.pt")
 
-        exit()
     else:
+        print("Use pretrained model.")
+        print("Performance of the pretrained model under variations:")
         parent_path = args.model_path
         header = args.header
         try:
@@ -334,9 +311,7 @@ if __name__ == "__main__":
 
     
     state_dict = torch.load(os.path.join(parent_path, f"saved_B_{header}.pt"), map_location=device)
-    # model.to_first_only()
     model.load_state_dict(state_dict)
-    # model.from_first_back_second()
     model.back_real(device)
     model.push_S_device()
     criteria = SCrossEntropyLoss()
@@ -345,11 +320,7 @@ if __name__ == "__main__":
     model.clear_noise()
 
     model.normalize()
-    print(f"No mask no noise: {CEval():.4f}")
     GetSecond()
-    print(f"S grad before masking: {model.fetch_S_grad().item():E}")
-    # if "Res18" in args.model or "TIN" in args.model:
-    #     model.fine_S_grad()
     model.fine_S_grad()
     
     if args.use_mask:
@@ -357,33 +328,14 @@ if __name__ == "__main__":
         mask_acc_list = []
         th = model.calc_sail_th(args.mask_p, args.method, args.alpha)
         model.set_mask_sail(th, "th", args.method, args.alpha)
-        print(th)
-        # if not args.layerwise:
-        #     mask_acc_list = []
-        #     th = model.calc_sail_th(args.mask_p, args.method, args.alpha)
-        #     model.set_mask_sail(th, "th", args.method, args.alpha)
-        #     print(th)
-        # else:
-        #     layers = [model.conv1, model.fc]
-        #     for l in layers:
-        #         for m in l.modules():
-        #             if isinstance(m, SModule):
-        #                 m.mask = torch.zeros_like(m.weightS)
-        #     layers = [model.layer1, model.layer2, model.layer3, model.layer4]
-        #     for l in layers:
-        #         tmp = modules.SModel()
-        #         tmp.l = l
-        #         th = tmp.calc_sail_th(args.mask_p, args.method, args.alpha)
-        #         tmp.set_mask_sail(th, "th", args.method, args.alpha)
 
         total, RM_new = model.get_mask_info()
-        print(f"Weights removed: {RM_new/total:f}")
+        print(f"Weights protected by write-verify: {RM_new/total * 100:.2f}%")
         model.de_normalize()
-        print(f"S grad after  masking: {model.fetch_S_grad().item():E}")
         fine_mask_acc_list = []
-        print(f"Finetune no noise: {CEval():.4f}")
+        print(f"Accuracy after masking w/o noise: {CEval():.4f}")
         loader = range(args.noise_epoch)
         for _ in loader:
             acc = NEval(args.dev_var, args.write_var)
             fine_mask_acc_list.append(acc)
-        print(f"Finetune noise average acc: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")
+        print(f"Accuracy after masking w/ noise, average: {np.mean(fine_mask_acc_list):.4f}, std: {np.std(fine_mask_acc_list):.4f}")

@@ -91,6 +91,8 @@ class SModule(nn.Module):
         if method == "SM":
             # return self.weightS.grad.data.abs() * alpha - self.op.weight.data.abs()
             return self.weightS.grad.data.abs() * self.op.weight.abs().max() * alpha + self.op.weight.data.abs()
+        if method == "random":
+            return torch.randn_like(self.weightS.grad)
         else:
             raise NotImplementedError(f"method {method} not supported")
     

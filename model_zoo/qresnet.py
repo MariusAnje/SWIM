@@ -261,13 +261,6 @@ class ResNet(SModel):
     def forward(self, x: Tensor) -> Tensor:
         return self._forward_impl(x)
     
-    # def fine_S_grad(self):
-    #     for m in self.modules():
-    #         if isinstance(m, BasicBlock):
-    #             # print("here")
-    #             for sm in m.modules():
-    #                 if isinstance(sm, SModule):
-    #                     sm.weightS.grad.data += sm.op.weight.grad.data * 2
 
 
 def _resnet(

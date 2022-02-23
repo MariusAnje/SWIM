@@ -1,5 +1,5 @@
 import torch
-from modules import SModule, NModule
+from modules import SModule, NModule, SModel
 from Functions import QuantFunction
 from torch import nn
 from Functions import SLinearFunction, SConv2dFunction, SMSEFunction, SCrossEntropyLossFunction, SBatchNorm2dFunction
@@ -72,7 +72,10 @@ class QNLinear(NModule):
         return new
 
     def forward(self, x):
-        x = self.function(x, quant(self.N, self.op.weight) + self.noise, quant(self.N, self.op.bias))
+        if self.op.bias is not None:
+            x = self.function(x, quant(self.N, self.op.weight) + self.noise, quant(self.N, self.op.bias))
+        else:
+            x = self.function(x, quant(self.N, self.op.weight) + self.noise, self.op.bias)
         return quant(self.N, x)
 
 class QNConv2d(NModule):
@@ -98,5 +101,14 @@ class QNConv2d(NModule):
                 m.bias.zero_()
 
     def forward(self, x):
-        x = self.function(x, quant(self.N, self.op.weight) + self.noise, quant(self.N, self.op.bias), self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
+        if self.op.bias is not None:
+            x = self.function(x, quant(self.N, self.op.weight) + self.noise, quant(self.N, self.op.bias), self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
+        else:
+            x = self.function(x, quant(self.N, self.op.weight) + self.noise, self.op.bias, self.op.stride, self.op.padding, self.op.dilation, self.op.groups)
         return quant(self.N, x)
+
+class QSModel(SModel):
+    def set_quantization(self, N):
+        for m in self.modules():
+            if isinstance(m, SModule) or isinstance(m, NModule):
+                m.N = N

@@ -3,10 +3,10 @@ import torchvision
 from torch import optim
 import torchvision.transforms as transforms
 import numpy as np
-from models import SCrossEntropyLoss, SMLP3, SMLP4, SLeNet, CIFAR, FakeSCrossEntropyLoss
-from qmodels import QSLeNet, QCIFAR
-import resnet
-import qresnet
+from model_zoo.models import SCrossEntropyLoss, SMLP3, SMLP4, SLeNet, CIFAR, FakeSCrossEntropyLoss
+from model_zoo.qmodels import QSLeNet, QCIFAR
+from model_zoo import resnet
+from model_zoo import qresnet
 from modules import SModule
 from tqdm import tqdm
 import time
@@ -302,6 +302,4 @@ if __name__ == "__main__":
     print(f"No mask no noise: {CEval():.4f}")
     model.to_first_only()
     NTrain(args.train_iter, header, args.dev_var, args.dev_var, args.eval_gap, args.verbose)
-    
-    # model.from_first_back_second()
     
