@@ -18,7 +18,7 @@ The major file of experiment is selective_write.py
 ### Training model from scratch
 
 ```shell
-python selective_write.py --model QLeNet --train_epoch 20 --noise_epoch 100 --mask_p 0.1
+python selective_write.py --model QLeNet --dev_var 0.1 --train_epoch 20 --noise_epoch 100 --mask_p 0.1
 ```
 
 Useful arguments:
